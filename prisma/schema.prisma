@@ -1,0 +1,358 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────
+// DOMAIN: sec_ (Security)
+// ──────────────────────────────────────────
+
+model SecRole {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  users SecUser[]
+
+  @@map("sec_role")
+}
+
+model SecUser {
+  id           String    @id @default(cuid())
+  name         String
+  lastname     String
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  roleId       String    @map("role_id")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  createdBy    String?   @map("created_by")
+  updatedBy    String?   @map("updated_by")
+  deletedBy    String?   @map("deleted_by")
+
+  role              SecRole            @relation(fields: [roleId], references: [id])
+  ticketsCreated    HdTicket[]         @relation("TicketRequester")
+  ticketsAssigned   HdTicket[]         @relation("TicketAssignee")
+  comments          HdTicketComment[]
+  knowledgeArticles KbArticle[]
+  credentials       SecCredential[]
+  auditLogs         AudLog[]
+
+  @@index([email], map: "idx_sec_user_email")
+  @@index([roleId], map: "idx_sec_user_role_id")
+  @@map("sec_user")
+}
+
+model SecCredential {
+  id                String    @id @default(cuid())
+  name              String
+  username          String
+  encryptedPassword String    @map("encrypted_password")
+  encryptionIv      String    @map("encryption_iv")
+  url               String?
+  assetId           String?   @map("asset_id")
+  ownerId           String?   @map("owner_id")
+  expiresAt         DateTime? @map("expires_at")
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+  createdBy         String?   @map("created_by")
+  updatedBy         String?   @map("updated_by")
+  deletedBy         String?   @map("deleted_by")
+
+  owner    SecUser?              @relation(fields: [ownerId], references: [id])
+  accesses SecCredentialAccess[]
+
+  @@index([ownerId], map: "idx_sec_credential_owner_id")
+  @@map("sec_credential")
+}
+
+model SecCredentialAccess {
+  id           String   @id @default(cuid())
+  credentialId String   @map("credential_id")
+  userId       String   @map("user_id")
+  action       String   @default("view")
+  ipAddress    String?  @map("ip_address")
+  accessedAt   DateTime @default(now()) @map("accessed_at")
+
+  credential SecCredential @relation(fields: [credentialId], references: [id])
+
+  @@index([credentialId], map: "idx_sec_credential_access_credential_id")
+  @@index([userId], map: "idx_sec_credential_access_user_id")
+  @@map("sec_credential_access")
+}
+
+// ──────────────────────────────────────────
+// DOMAIN: cfg_ (Configuration)
+// ──────────────────────────────────────────
+
+model CfgCategory {
+  id      String    @id @default(cuid())
+  name    String    @unique
+  color   String?
+
+  tickets HdTicket[]
+
+  @@map("cfg_category")
+}
+
+model CfgPriority {
+  id           String  @id @default(cuid())
+  name         String  @unique
+  level        Int
+  responseTime Int     @map("response_time")
+  resolveTime  Int     @map("resolve_time")
+  color        String?
+
+  tickets HdTicket[]
+  slas    CfgSla[]
+
+  @@map("cfg_priority")
+}
+
+model CfgStatus {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  color    String?
+  isClosed Boolean @default(false) @map("is_closed")
+
+  tickets HdTicket[]
+
+  @@map("cfg_status")
+}
+
+model CfgSla {
+  id            String  @id @default(cuid())
+  name          String
+  priorityId    String  @map("priority_id")
+  responseTimeH Int     @map("response_time_h")
+  resolveTimeH  Int     @map("resolve_time_h")
+  isActive      Boolean @default(true) @map("is_active")
+
+  priority CfgPriority @relation(fields: [priorityId], references: [id])
+
+  @@index([priorityId], map: "idx_cfg_sla_priority_id")
+  @@map("cfg_sla")
+}
+
+// ──────────────────────────────────────────
+// DOMAIN: hd_ (HelpDesk)
+// ──────────────────────────────────────────
+
+model HdCustomer {
+  id        String    @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  taxId     String?   @unique @map("tax_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  contracts HdContract[]
+
+  @@index([taxId], map: "idx_hd_customer_tax_id")
+  @@map("hd_customer")
+}
+
+model HdContract {
+  id             String    @id @default(cuid())
+  customerId     String    @map("customer_id")
+  contractNumber String    @unique @map("contract_number")
+  startDate      DateTime  @map("start_date")
+  endDate        DateTime  @map("end_date")
+  amount         Decimal?
+  status         String    @default("active")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+  createdBy      String?   @map("created_by")
+  updatedBy      String?   @map("updated_by")
+
+  customer HdCustomer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId], map: "idx_hd_contract_customer_id")
+  @@index([endDate], map: "idx_hd_contract_end_date")
+  @@map("hd_contract")
+}
+
+model HdTicket {
+  id           String    @id @default(cuid())
+  ticketNumber String    @unique @map("ticket_number")
+  title        String
+  description  String
+  requesterId  String    @map("requester_id")
+  assigneeId   String?   @map("assignee_id")
+  categoryId   String?   @map("category_id")
+  priorityId   String    @map("priority_id")
+  statusId     String    @map("status_id")
+  slaDeadline  DateTime? @map("sla_deadline")
+  closedAt     DateTime? @map("closed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  createdBy    String?   @map("created_by")
+  updatedBy    String?   @map("updated_by")
+
+  requester SecUser      @relation("TicketRequester", fields: [requesterId], references: [id])
+  assignee  SecUser?     @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  category  CfgCategory? @relation(fields: [categoryId], references: [id])
+  priority  CfgPriority  @relation(fields: [priorityId], references: [id])
+  status    CfgStatus    @relation(fields: [statusId], references: [id])
+  comments  HdTicketComment[]
+  history   HdTicketHistory[]
+
+  @@index([requesterId], map: "idx_hd_ticket_requester_id")
+  @@index([assigneeId], map: "idx_hd_ticket_assignee_id")
+  @@index([statusId], map: "idx_hd_ticket_status_id")
+  @@index([priorityId], map: "idx_hd_ticket_priority_id")
+  @@index([createdAt], map: "idx_hd_ticket_created_at")
+  @@index([slaDeadline], map: "idx_hd_ticket_sla_deadline")
+  @@map("hd_ticket")
+}
+
+model HdTicketComment {
+  id         String   @id @default(cuid())
+  ticketId   String   @map("ticket_id")
+  userId     String   @map("user_id")
+  content    String
+  isInternal Boolean  @default(false) @map("is_internal")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  ticket HdTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   SecUser  @relation(fields: [userId], references: [id])
+
+  @@index([ticketId], map: "idx_hd_ticket_comment_ticket_id")
+  @@map("hd_ticket_comment")
+}
+
+model HdTicketHistory {
+  id        String   @id @default(cuid())
+  ticketId  String   @map("ticket_id")
+  field     String
+  oldValue  String?  @map("old_value")
+  newValue  String?  @map("new_value")
+  changedBy String   @map("changed_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ticket HdTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId], map: "idx_hd_ticket_history_ticket_id")
+  @@map("hd_ticket_history")
+}
+
+// ──────────────────────────────────────────
+// DOMAIN: inv_ (Inventory)
+// ──────────────────────────────────────────
+
+model InvAsset {
+  id           String    @id @default(cuid())
+  assetCode    String    @unique @map("asset_code")
+  name         String
+  brand        String?
+  model        String?
+  serialNumber String?   @map("serial_number")
+  categoryId   String?   @map("category_id")
+  status       String    @default("active")
+  location     String?
+  assignedTo   String?   @map("assigned_to")
+  purchaseDate DateTime? @map("purchase_date")
+  warrantyEnd  DateTime? @map("warranty_end")
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  createdBy    String?   @map("created_by")
+  updatedBy    String?   @map("updated_by")
+
+  @@index([assetCode], map: "idx_inv_asset_code")
+  @@index([assignedTo], map: "idx_inv_asset_assigned_to")
+  @@map("inv_asset")
+}
+
+model InvInfraAsset {
+  id              String    @id @default(cuid())
+  hostname        String
+  ipAddress       String?   @map("ip_address")
+  operatingSystem String?   @map("operating_system")
+  environment     String?
+  ownerId         String?   @map("owner_id")
+  criticality     String?
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  @@index([hostname], map: "idx_inv_infra_asset_hostname")
+  @@map("inv_infra_asset")
+}
+
+// ──────────────────────────────────────────
+// DOMAIN: kb_ (Knowledge Base)
+// ──────────────────────────────────────────
+
+model KbCategory {
+  id       String      @id @default(cuid())
+  name     String      @unique
+
+  articles KbArticle[]
+
+  @@map("kb_category")
+}
+
+model KbArticle {
+  id         String    @id @default(cuid())
+  title      String
+  content    String
+  categoryId String?   @map("category_id")
+  authorId   String    @map("author_id")
+  published  Boolean   @default(false)
+  views      Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+  createdBy  String?   @map("created_by")
+  updatedBy  String?   @map("updated_by")
+
+  category KbCategory? @relation(fields: [categoryId], references: [id])
+  author   SecUser     @relation(fields: [authorId], references: [id])
+
+  @@index([categoryId], map: "idx_kb_article_category_id")
+  @@index([authorId], map: "idx_kb_article_author_id")
+  @@map("kb_article")
+}
+
+// ──────────────────────────────────────────
+// DOMAIN: aud_ (Audit)
+// ──────────────────────────────────────────
+
+model AudLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  oldData   Json?    @map("old_data")
+  newData   Json?    @map("new_data")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user SecUser? @relation(fields: [userId], references: [id])
+
+  @@index([userId], map: "idx_aud_log_user_id")
+  @@index([entity, entityId], map: "idx_aud_log_entity")
+  @@index([createdAt], map: "idx_aud_log_created_at")
+  @@map("aud_log")
+}
