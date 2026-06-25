@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/auth";
+import {
+  requireSession,
+  ForbiddenError,
+  UnauthorizedError,
+  ROLES,
+} from "@/lib/auth";
 
 const createTicketSchema = z.object({
   title: z.string().min(1).max(200),
@@ -17,9 +22,16 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status");
     const priority = searchParams.get("priority");
 
+    // Usuario Final solo puede ver sus propios tickets
+    const ownerFilter =
+      session.role === ROLES.USUARIO
+        ? { requesterId: session.userId }
+        : {};
+
     const tickets = await prisma.hdTicket.findMany({
       where: {
         deletedAt: null,
+        ...ownerFilter,
         ...(status ? { status: { name: status } } : {}),
         ...(priority ? { priority: { name: priority } } : {}),
       },
@@ -36,6 +48,12 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ tickets });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ message: error.message }, { status: 401 });
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ message: error.message }, { status: 403 });
+    }
     console.error("[TICKETS GET]", error);
     return NextResponse.json(
       { message: "Error interno del servidor" },
@@ -47,6 +65,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
+
+    // Auditor no puede crear tickets
+    if (session.role === ROLES.AUDITOR) {
+      throw new ForbiddenError("Los auditores no pueden crear tickets");
+    }
+
     const body = await req.json();
     const data = createTicketSchema.parse(body);
 
@@ -73,6 +97,7 @@ export async function POST(req: NextRequest) {
         requesterId: session.userId,
         priorityId: priorityRecord.id,
         statusId: statusRecord.id,
+        createdBy: session.userId,
         ...(data.category
           ? {
               category: {
@@ -88,6 +113,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ticket }, { status: 201 });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ message: error.message }, { status: 401 });
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ message: error.message }, { status: 403 });
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Datos inválidos", errors: error.issues },
