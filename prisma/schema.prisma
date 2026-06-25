@@ -38,13 +38,14 @@ model SecUser {
   updatedBy    String?   @map("updated_by")
   deletedBy    String?   @map("deleted_by")
 
-  role              SecRole            @relation(fields: [roleId], references: [id])
-  ticketsCreated    HdTicket[]         @relation("TicketRequester")
-  ticketsAssigned   HdTicket[]         @relation("TicketAssignee")
+  role              SecRole                  @relation(fields: [roleId], references: [id])
+  ticketsCreated    HdTicket[]               @relation("TicketRequester")
+  ticketsAssigned   HdTicket[]               @relation("TicketAssignee")
   comments          HdTicketComment[]
   knowledgeArticles KbArticle[]
   credentials       SecCredential[]
   auditLogs         AudLog[]
+  passwordResets    SecPasswordResetToken[]
 
   @@index([email], map: "idx_sec_user_email")
   @@index([roleId], map: "idx_sec_user_role_id")
@@ -89,6 +90,21 @@ model SecCredentialAccess {
   @@index([credentialId], map: "idx_sec_credential_access_credential_id")
   @@index([userId], map: "idx_sec_credential_access_user_id")
   @@map("sec_credential_access")
+}
+
+model SecPasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user SecUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token], map: "idx_sec_pwd_reset_token")
+  @@index([userId], map: "idx_sec_pwd_reset_user_id")
+  @@map("sec_password_reset_token")
 }
 
 // ──────────────────────────────────────────
