@@ -35,14 +35,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const tokenExpiresIn = remember ? "30d" : (process.env.JWT_EXPIRES_IN ?? "8h");
+    const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8;
+
     const token = signToken({
       userId: user.id,
       email: user.email,
       role: user.role.name,
       name: `${user.name} ${user.lastname}`,
-    });
-
-    const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8;
+    }, tokenExpiresIn);
 
     const response = NextResponse.json({
       message: "Login exitoso",
