@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
     const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
-    await resend.emails.send({
+    const { error: emailError } = await resend.emails.send({
       from: process.env.RESEND_FROM ?? "HelpDesk <noreply@tudominio.com>",
       to: user.email,
       subject: "Restablecer contraseña — HelpDesk",
@@ -68,6 +68,10 @@ export async function POST(req: NextRequest) {
         </div>
       `,
     });
+
+    if (emailError) {
+      console.error("[FORGOT_PASSWORD] Resend error:", emailError);
+    }
 
     return genericResponse;
   } catch (error) {
