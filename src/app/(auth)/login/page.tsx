@@ -70,21 +70,27 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-600 mb-1.5">Email</label>
+            <label className="block text-sm text-gray-600 mb-1.5">
+              Usuario o correo
+            </label>
             <div className="relative">
               <User
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300"
                 size={16}
               />
               <input
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="usuario@empresa.cl"
+                placeholder="jperez  ·  jperez@empresa.cl"
                 required
+                autoComplete="username"
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
               />
             </div>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Puedes ingresar con tu usuario de red o email corporativo.
+            </p>
           </div>
 
           <div>
