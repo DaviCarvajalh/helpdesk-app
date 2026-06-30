@@ -34,10 +34,10 @@ export default function TicketDetailPage() {
   const [loading, setLoading]   = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  const [statuses,    setStatuses]    = useState<StatusOption[]>([]);
-  const [technicians, setTechnicians] = useState<TechOption[]>([]);
-  const [updating,    setUpdating]    = useState(false);
-  const [closing,     setClosing]     = useState(false);
+  const [statuses,      setStatuses]      = useState<StatusOption[]>([]);
+  const [technicians,   setTechnicians]   = useState<TechOption[]>([]);
+  const [updating,      setUpdating]      = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
 
   const [comment, setComment]   = useState("");
   const [internal, setInternal] = useState(false);
@@ -61,6 +61,11 @@ export default function TicketDetailPage() {
       });
   }, []);
 
+  // Sincronizar selectedStatus cuando carga el ticket
+  useEffect(() => {
+    if (ticket?.status?.id) setSelectedStatus(ticket.status.id);
+  }, [ticket?.status?.id]);
+
   async function patch(payload: Record<string, unknown>) {
     setUpdating(true);
     const res = await fetch(`/api/tickets/${id}`, {
@@ -72,12 +77,9 @@ export default function TicketDetailPage() {
     setUpdating(false);
   }
 
-  async function closeTicket() {
-    const closedStatus = statuses.find((s) => s.isClosed);
-    if (!closedStatus) return;
-    setClosing(true);
-    await patch({ statusId: closedStatus.id });
-    setClosing(false);
+  async function applyStatus() {
+    if (!selectedStatus || selectedStatus === ticket?.status?.id) return;
+    await patch({ statusId: selectedStatus });
   }
 
   async function sendComment(e: React.FormEvent) {
@@ -232,14 +234,13 @@ export default function TicketDetailPage() {
                   <p className="text-xs text-gray-400 mb-1.5">Estado</p>
                   <div className="relative">
                     <select
-                      value={ticket.status?.id ?? ""}
-                      onChange={(e) => patch({ statusId: e.target.value })}
+                      value={selectedStatus}
+                      onChange={(e) => setSelectedStatus(e.target.value)}
                       disabled={updating}
                       className="w-full pl-3 pr-8 py-2 border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 appearance-none disabled:opacity-60"
-                      style={{ color: ticket.status?.color ?? undefined }}
                     >
                       {statuses.map((s) => (
-                        <option key={s.id} value={s.id} style={{ color: s.color ?? undefined }}>{s.name}</option>
+                        <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
                     <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -265,22 +266,14 @@ export default function TicketDetailPage() {
                   </div>
                 </div>
 
-                {/* Cerrar ticket */}
-                {!ticket.status?.isClosed && (
-                  <button
-                    onClick={closeTicket}
-                    disabled={closing || updating || !statuses.some((s) => s.isClosed)}
-                    className="w-full flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-300 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
-                    <CheckCircle2 size={14} />
-                    {closing ? "Cerrando..." : "Cerrar Ticket"}
-                  </button>
-                )}
-
-                {ticket.status?.isClosed && (
-                  <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                    <CheckCircle2 size={13} /> Ticket cerrado
-                  </div>
-                )}
+                {/* Botón aplicar estado */}
+                <button
+                  onClick={applyStatus}
+                  disabled={updating || !selectedStatus || selectedStatus === ticket.status?.id}
+                  className="w-full flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-200 disabled:text-gray-400 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
+                  <CheckCircle2 size={14} />
+                  {updating ? "Aplicando..." : "Aplicar Estado"}
+                </button>
               </div>
 
               {/* Detalles */}
