@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Plus, Search, Ticket, AlertCircle, Clock,
@@ -30,6 +31,7 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
 };
 
 export default function TicketsClient() {
+  const router = useRouter();
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search,  setSearch]  = useState("");
@@ -133,7 +135,7 @@ export default function TicketsClient() {
                 </td>
               </tr>
             ) : filtered.map((t) => (
-              <tr key={t.id} className="hover:bg-gray-50 transition-colors cursor-pointer">
+              <tr key={t.id} onClick={() => router.push(`/tickets/${t.id}`)} className="hover:bg-gray-50 transition-colors cursor-pointer">
                 <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">{t.ticketNumber}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -146,9 +148,7 @@ export default function TicketsClient() {
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/tickets/${t.id}`} className="font-medium text-gray-800 hover:text-emerald-600 transition-colors line-clamp-1">
-                    {t.title}
-                  </Link>
+                  <p className="font-medium text-gray-800 line-clamp-1">{t.title}</p>
                   {t.category && <p className="text-xs text-gray-400 mt-0.5">{t.category.name}</p>}
                 </td>
                 <td className="px-4 py-3">
