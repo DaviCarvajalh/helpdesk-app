@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSession, UnauthorizedError, ForbiddenError, ROLES } from "@/lib/auth";
+import { sendTicketAssigned, sendTicketClosed } from "@/lib/email";
 
 const patchSchema = z.object({
   statusId:   z.string().optional(),
@@ -31,6 +32,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           include: { user: { select: { id: true, name: true, lastname: true } } },
           orderBy: { createdAt: "asc" },
         },
+        history: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 
@@ -53,20 +57,78 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const body  = await req.json();
     const data  = patchSchema.parse(body);
 
-    const ticket = await prisma.hdTicket.findFirst({ where: { id: params.id, deletedAt: null } });
+    const ticket = await prisma.hdTicket.findFirst({
+      where: { id: params.id, deletedAt: null },
+      include: { status: true, assignee: true, priority: true },
+    });
     if (!ticket) return NextResponse.json({ message: "Ticket no encontrado" }, { status: 404 });
 
-    const updated = await prisma.hdTicket.update({
-      where: { id: params.id },
-      data: { ...data, updatedBy: session.userId } as object,
-      include: {
-        requester: { select: { id: true, name: true, lastname: true } },
-        assignee:  { select: { id: true, name: true, lastname: true } },
-        priority:  true,
-        status:    true,
-        category:  true,
-      },
-    });
+    // Construir registros de historial para cada campo que cambia
+    const LABEL: Record<string, string> = {
+      statusId: "Estado", assigneeId: "Técnico asignado",
+      priorityId: "Prioridad", title: "Título", description: "Descripción",
+    };
+    const historyRecords: { ticketId: string; field: string; oldValue: string | null; newValue: string | null; changedBy: string }[] = [];
+
+    for (const [field, newVal] of Object.entries(data)) {
+      const oldVal = (ticket as Record<string, unknown>)[field];
+      const newValStr = newVal == null ? null : String(newVal);
+      const oldValStr = oldVal == null ? null : String(oldVal);
+      if (newValStr !== oldValStr) {
+        historyRecords.push({
+          ticketId: params.id,
+          field: LABEL[field] ?? field,
+          oldValue: oldValStr,
+          newValue: newValStr,
+          changedBy: session.userId,
+        });
+      }
+    }
+
+    const [updated] = await prisma.$transaction([
+      prisma.hdTicket.update({
+        where: { id: params.id },
+        data: { ...data, updatedBy: session.userId } as object,
+        include: {
+          requester: { select: { id: true, name: true, lastname: true } },
+          assignee:  { select: { id: true, name: true, lastname: true } },
+          priority:  true,
+          status:    true,
+          category:  true,
+        },
+      }),
+      ...(historyRecords.length > 0
+        ? [prisma.hdTicketHistory.createMany({ data: historyRecords })]
+        : []),
+    ]);
+
+    // Emails fire-and-forget
+    const updatedTicket = updated as typeof updated & { status?: { isClosed?: boolean }; assignee?: { id?: string; name?: string; lastname?: string } | null };
+
+    // Email al nuevo técnico si cambió assigneeId
+    if (data.assigneeId && data.assigneeId !== ticket.assigneeId) {
+      prisma.secUser.findUnique({ where: { id: data.assigneeId }, select: { email: true, name: true, lastname: true } })
+        .then((u) => {
+          if (u?.email) sendTicketAssigned({
+            to: u.email, techName: `${u.name} ${u.lastname}`,
+            ticketNumber: ticket.ticketNumber, ticketId: ticket.id,
+            title: ticket.title,
+            requester: `${ticket.requesterId}`,
+          });
+        }).catch(() => {});
+    }
+
+    // Email al solicitante si el nuevo estado es cerrado
+    if (data.statusId && updatedTicket.status?.isClosed) {
+      prisma.secUser.findUnique({ where: { id: ticket.requesterId }, select: { email: true, name: true, lastname: true } })
+        .then((u) => {
+          if (u?.email) sendTicketClosed({
+            to: u.email, name: `${u.name} ${u.lastname}`,
+            ticketNumber: ticket.ticketNumber, ticketId: ticket.id,
+            title: ticket.title,
+          });
+        }).catch(() => {});
+    }
 
     return NextResponse.json({ ticket: updated });
   } catch (error) {

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Plus, Search, Ticket, AlertCircle, Clock,
-  CheckCircle2, XCircle, AlertTriangle, FileText,
+  CheckCircle2, XCircle, AlertTriangle, FileText, LayoutGrid,
 } from "lucide-react";
 
 interface TicketRow {
@@ -68,10 +68,16 @@ export default function TicketsClient() {
           <h1 className="text-2xl font-bold text-gray-800">Tickets</h1>
           <p className="text-sm text-gray-500 mt-0.5">Gestión de solicitudes e incidentes</p>
         </div>
-        <Link href="/tickets/new"
-          className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm">
-          <Plus size={15} /> Nuevo Ticket
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/tickets/kanban"
+            className="flex items-center gap-2 border border-gray-200 hover:bg-gray-50 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <LayoutGrid size={15} /> Kanban
+          </Link>
+          <Link href="/tickets/new"
+            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm">
+            <Plus size={15} /> Nuevo Ticket
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}

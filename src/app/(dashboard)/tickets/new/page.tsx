@@ -85,7 +85,15 @@ export default function NewTicketPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.message ?? "Error al crear el ticket"); return; }
-      router.push("/tickets");
+
+      // Subir imágenes adjuntas si las hay
+      if (images.length > 0) {
+        const fd = new FormData();
+        images.forEach((img) => fd.append("files", img));
+        await fetch(`/api/tickets/${data.ticket.id}/attachments`, { method: "POST", body: fd });
+      }
+
+      router.push(`/tickets/${data.ticket.id}`);
     } catch { setError("Error de conexión"); }
     finally { setLoading(false); }
   }

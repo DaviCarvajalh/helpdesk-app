@@ -4,26 +4,32 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
+import Image from "next/image";
 import {
   ArrowLeft, AlertTriangle, FileText, User, Calendar,
-  Tag, Send, MessageSquare, Clock, CheckCircle2, ChevronDown,
+  Tag, Send, MessageSquare, Clock, CheckCircle2, ChevronDown, History, Paperclip,
 } from "lucide-react";
 
 interface Comment {
   id: string; content: string; isInternal: boolean; createdAt: string;
   user: { id: string; name: string; lastname: string };
 }
+interface HistoryEntry {
+  id: string; field: string; oldValue: string | null; newValue: string | null;
+  changedBy: string; createdAt: string;
+}
 interface StatusOption    { id: string; name: string; color?: string | null; isClosed: boolean; }
 interface TechOption      { id: string; name: string; lastname: string; }
 interface Ticket {
   id: string; ticketNumber: string; type: string; title: string;
-  description: string; createdAt: string; updatedAt: string;
+  description: string; createdAt: string; updatedAt: string; slaDeadline?: string | null;
   requester:  { id: string; name: string; lastname: string; email: string } | null;
   assignee:   { id: string; name: string; lastname: string } | null;
   priority:   { id: string; name: string; color?: string | null } | null;
   status:     { id: string; name: string; color?: string | null; isClosed: boolean } | null;
   category:   { id: string; name: string } | null;
   comments:   Comment[];
+  history:    HistoryEntry[];
 }
 
 export default function TicketDetailPage() {
@@ -39,6 +45,8 @@ export default function TicketDetailPage() {
   const [updating,      setUpdating]      = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>("");
 
+  const [attachments, setAttachments] = useState<string[]>([]);
+
   const [comment, setComment]   = useState("");
   const [internal, setInternal] = useState(false);
   const [sending, setSending]   = useState(false);
@@ -50,7 +58,12 @@ export default function TicketDetailPage() {
     setLoading(false);
   }
 
-  useEffect(() => { loadTicket(); }, [id]);
+  async function loadAttachments() {
+    const res = await fetch(`/api/tickets/${id}/attachments/list`);
+    if (res.ok) setAttachments((await res.json()).urls ?? []);
+  }
+
+  useEffect(() => { loadTicket(); loadAttachments(); }, [id]);
 
   useEffect(() => {
     fetch("/api/tickets/options")
@@ -220,6 +233,50 @@ export default function TicketDetailPage() {
                   </div>
                 </form>
               </div>
+
+              {/* Adjuntos */}
+              {attachments.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <Paperclip size={14} className="text-gray-400" />
+                    Archivos adjuntos ({attachments.length})
+                  </h2>
+                  <div className="grid grid-cols-3 gap-2">
+                    {attachments.map((url) => (
+                      <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                        className="block rounded-lg overflow-hidden border border-gray-100 hover:opacity-80 transition-opacity">
+                        <Image src={url} alt="adjunto" width={160} height={100}
+                          className="w-full h-24 object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Historial */}
+              {ticket.history.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                  <h2 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                    <History size={14} className="text-gray-400" />
+                    Historial de cambios
+                  </h2>
+                  <div className="space-y-2">
+                    {ticket.history.map((h) => (
+                      <div key={h.id} className="flex items-start gap-3 text-xs">
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-300 mt-1.5 shrink-0" />
+                        <div className="flex-1">
+                          <span className="text-gray-500">
+                            <span className="font-medium text-gray-700">{h.field}</span>
+                            {h.oldValue && <> cambió de <span className="line-through text-gray-400">{h.oldValue}</span></>}
+                            {h.newValue && <> a <span className="font-medium text-gray-700">{h.newValue}</span></>}
+                          </span>
+                          <span className="text-gray-300 ml-2">{new Date(h.createdAt).toLocaleString("es-CL")}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Sidebar */}
@@ -318,6 +375,29 @@ export default function TicketDetailPage() {
                       <p className="text-gray-700">{new Date(ticket.updatedAt).toLocaleString("es-CL")}</p>
                     </div>
                   </div>
+
+                  {ticket.slaDeadline && (() => {
+                    const sla  = new Date(ticket.slaDeadline);
+                    const now  = new Date();
+                    const diff = sla.getTime() - now.getTime();
+                    const hrs  = Math.floor(diff / 3600000);
+                    const over = diff < 0;
+                    const warn = !over && hrs < 4;
+                    return (
+                      <div className="flex items-start gap-3">
+                        <Clock size={14} className={`mt-0.5 shrink-0 ${over ? "text-red-500" : warn ? "text-yellow-500" : "text-gray-400"}`} />
+                        <div>
+                          <p className="text-xs text-gray-400 mb-0.5">SLA vence</p>
+                          <p className={`font-medium text-sm ${over ? "text-red-600" : warn ? "text-yellow-600" : "text-gray-700"}`}>
+                            {sla.toLocaleString("es-CL")}
+                          </p>
+                          <p className={`text-xs mt-0.5 ${over ? "text-red-500" : warn ? "text-yellow-500" : "text-gray-400"}`}>
+                            {over ? `Vencido hace ${Math.abs(hrs)}h` : `${hrs}h restantes`}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

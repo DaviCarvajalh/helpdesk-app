@@ -7,6 +7,7 @@ import {
   UnauthorizedError,
   ROLES,
 } from "@/lib/auth";
+import { sendTicketCreated } from "@/lib/email";
 
 const createTicketSchema = z.object({
   type: z.enum(["incidente", "requerimiento"]).default("incidente"),
@@ -91,6 +92,11 @@ export async function POST(req: NextRequest) {
     const count = await prisma.hdTicket.count();
     const ticketNumber = `HD-${String(count + 1).padStart(5, "0")}`;
 
+    // SLA deadline: ahora + resolveTime horas de la prioridad
+    const slaDeadline = priorityRecord.resolveTime > 0
+      ? new Date(Date.now() + priorityRecord.resolveTime * 60 * 60 * 1000)
+      : null;
+
     const ticket = await prisma.hdTicket.create({
       data: {
         ticketNumber,
@@ -102,8 +108,9 @@ export async function POST(req: NextRequest) {
         statusId: statusRecord.id,
         assigneeId: data.assigneeId || null,
         categoryId: data.categoryId || null,
+        slaDeadline,
         createdBy: session.userId,
-      },
+      } as Parameters<typeof prisma.hdTicket.create>[0]["data"],
       include: {
         requester: { select: { name: true, lastname: true } },
         priority: true,
@@ -111,6 +118,16 @@ export async function POST(req: NextRequest) {
         category: true,
       },
     });
+
+    // Email al solicitante (fire-and-forget)
+    prisma.secUser.findUnique({ where: { id: requesterId }, select: { email: true, name: true, lastname: true } })
+      .then((u) => {
+        if (u?.email) sendTicketCreated({
+          to: u.email, name: `${u.name} ${u.lastname}`,
+          ticketNumber: ticket.ticketNumber, ticketId: ticket.id,
+          title: ticket.title, priority: priorityRecord.name,
+        });
+      }).catch(() => {});
 
     return NextResponse.json({ ticket }, { status: 201 });
   } catch (error) {
