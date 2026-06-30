@@ -350,6 +350,38 @@ model KbArticle {
   @@map("kb_article")
 }
 
+model KbProcedure {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  category    String?
+  isPublished Boolean   @default(false) @map("is_published")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  createdBy   String?   @map("created_by")
+  updatedBy   String?   @map("updated_by")
+
+  steps KbProcedureStep[]
+
+  @@index([category], map: "idx_kb_procedure_category")
+  @@map("kb_procedure")
+}
+
+model KbProcedureStep {
+  id          String  @id @default(cuid())
+  procedureId String  @map("procedure_id")
+  order       Int
+  title       String
+  content     String?
+  isWarning   Boolean @default(false) @map("is_warning")
+
+  procedure KbProcedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+
+  @@index([procedureId], map: "idx_kb_procedure_step_procedure_id")
+  @@map("kb_procedure_step")
+}
+
 // ──────────────────────────────────────────
 // DOMAIN: aud_ (Audit)
 // ──────────────────────────────────────────
