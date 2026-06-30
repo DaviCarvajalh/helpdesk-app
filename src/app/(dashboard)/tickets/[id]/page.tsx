@@ -238,9 +238,10 @@ export default function TicketDetailPage() {
                       onChange={(e) => setSelectedStatus(e.target.value)}
                       disabled={updating}
                       className="w-full pl-3 pr-8 py-2 border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 appearance-none disabled:opacity-60"
+                      style={{ color: statuses.find((s) => s.id === selectedStatus)?.color ?? undefined }}
                     >
                       {statuses.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+                        <option key={s.id} value={s.id} style={{ color: s.color ?? undefined }}>{s.name}</option>
                       ))}
                     </select>
                     <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
