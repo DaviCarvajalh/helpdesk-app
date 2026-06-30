@@ -6,20 +6,22 @@ import Link from "next/link";
 import Header from "@/components/layout/Header";
 import {
   ArrowLeft, AlertTriangle, FileText, User, Calendar,
-  Tag, Send, MessageSquare, Clock,
+  Tag, Send, MessageSquare, Clock, CheckCircle2, ChevronDown,
 } from "lucide-react";
 
 interface Comment {
   id: string; content: string; isInternal: boolean; createdAt: string;
   user: { id: string; name: string; lastname: string };
 }
+interface StatusOption    { id: string; name: string; color?: string | null; isClosed: boolean; }
+interface TechOption      { id: string; name: string; lastname: string; }
 interface Ticket {
   id: string; ticketNumber: string; type: string; title: string;
   description: string; createdAt: string; updatedAt: string;
   requester:  { id: string; name: string; lastname: string; email: string } | null;
   assignee:   { id: string; name: string; lastname: string } | null;
   priority:   { id: string; name: string; color?: string | null } | null;
-  status:     { id: string; name: string; color?: string | null } | null;
+  status:     { id: string; name: string; color?: string | null; isClosed: boolean } | null;
   category:   { id: string; name: string } | null;
   comments:   Comment[];
 }
@@ -28,9 +30,14 @@ export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router  = useRouter();
 
-  const [ticket, setTicket]   = useState<Ticket | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [ticket, setTicket]     = useState<Ticket | null>(null);
+  const [loading, setLoading]   = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  const [statuses,    setStatuses]    = useState<StatusOption[]>([]);
+  const [technicians, setTechnicians] = useState<TechOption[]>([]);
+  const [updating,    setUpdating]    = useState(false);
+  const [closing,     setClosing]     = useState(false);
 
   const [comment, setComment]   = useState("");
   const [internal, setInternal] = useState(false);
@@ -44,6 +51,34 @@ export default function TicketDetailPage() {
   }
 
   useEffect(() => { loadTicket(); }, [id]);
+
+  useEffect(() => {
+    fetch("/api/tickets/options")
+      .then((r) => r.json())
+      .then((d) => {
+        setStatuses(d.statuses ?? []);
+        setTechnicians(d.technicians ?? []);
+      });
+  }, []);
+
+  async function patch(payload: Record<string, unknown>) {
+    setUpdating(true);
+    const res = await fetch(`/api/tickets/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) await loadTicket();
+    setUpdating(false);
+  }
+
+  async function closeTicket() {
+    const closedStatus = statuses.find((s) => s.isClosed);
+    if (!closedStatus) return;
+    setClosing(true);
+    await patch({ statusId: closedStatus.id });
+    setClosing(false);
+  }
 
   async function sendComment(e: React.FormEvent) {
     e.preventDefault();
@@ -187,6 +222,68 @@ export default function TicketDetailPage() {
 
             {/* Sidebar */}
             <div className="space-y-4">
+
+              {/* Acciones */}
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
+                <h2 className="text-sm font-semibold text-gray-700">Acciones</h2>
+
+                {/* Estado */}
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Estado</p>
+                  <div className="relative">
+                    <select
+                      value={ticket.status?.id ?? ""}
+                      onChange={(e) => patch({ statusId: e.target.value })}
+                      disabled={updating}
+                      className="w-full pl-3 pr-8 py-2 border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 appearance-none disabled:opacity-60"
+                      style={{ color: ticket.status?.color ?? undefined }}
+                    >
+                      {statuses.map((s) => (
+                        <option key={s.id} value={s.id} style={{ color: s.color ?? undefined }}>{s.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Asignado */}
+                <div>
+                  <p className="text-xs text-gray-400 mb-1.5">Técnico asignado</p>
+                  <div className="relative">
+                    <select
+                      value={ticket.assignee?.id ?? ""}
+                      onChange={(e) => patch({ assigneeId: e.target.value || null })}
+                      disabled={updating}
+                      className="w-full pl-3 pr-8 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 appearance-none disabled:opacity-60"
+                    >
+                      <option value="">Sin asignar</option>
+                      {technicians.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name} {t.lastname}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Cerrar ticket */}
+                {!ticket.status?.isClosed && (
+                  <button
+                    onClick={closeTicket}
+                    disabled={closing || updating || !statuses.some((s) => s.isClosed)}
+                    className="w-full flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-300 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
+                    <CheckCircle2 size={14} />
+                    {closing ? "Cerrando..." : "Cerrar Ticket"}
+                  </button>
+                )}
+
+                {ticket.status?.isClosed && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                    <CheckCircle2 size={13} /> Ticket cerrado
+                  </div>
+                )}
+              </div>
+
+              {/* Detalles */}
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
                 <h2 className="text-sm font-semibold text-gray-700">Detalles</h2>
 
@@ -199,16 +296,6 @@ export default function TicketDetailPage() {
                         {ticket.requester ? `${ticket.requester.name} ${ticket.requester.lastname}` : "—"}
                       </p>
                       {ticket.requester?.email && <p className="text-xs text-gray-400">{ticket.requester.email}</p>}
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <User size={14} className="text-gray-400 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Asignado a</p>
-                      <p className="text-gray-700 font-medium">
-                        {ticket.assignee ? `${ticket.assignee.name} ${ticket.assignee.lastname}` : <span className="text-gray-400 font-normal">Sin asignar</span>}
-                      </p>
                     </div>
                   </div>
 

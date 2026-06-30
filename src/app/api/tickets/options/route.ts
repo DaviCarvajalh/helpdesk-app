@@ -10,9 +10,10 @@ export async function GET() {
       session.role as typeof ROLES.ADMIN
     );
 
-    const [categories, priorities, technicians, users] = await Promise.all([
+    const [categories, priorities, statuses, technicians, users] = await Promise.all([
       prisma.cfgCategory.findMany({ orderBy: { name: "asc" } }),
       prisma.cfgPriority.findMany({ orderBy: { level: "asc" } }),
+      prisma.cfgStatus.findMany({ orderBy: { name: "asc" } }),
       // Técnicos y supervisores para asignar
       prisma.secUser.findMany({
         where: {
@@ -33,7 +34,7 @@ export async function GET() {
         : Promise.resolve([]),
     ]);
 
-    return NextResponse.json({ categories, priorities, technicians, users });
+    return NextResponse.json({ categories, priorities, statuses, technicians, users });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ message: error.message }, { status: 401 });
