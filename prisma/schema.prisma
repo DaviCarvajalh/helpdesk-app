@@ -205,6 +205,7 @@ model HdContract {
 model HdTicket {
   id           String    @id @default(cuid())
   ticketNumber String    @unique @map("ticket_number")
+  type         String    @default("incidente")
   title        String
   description  String
   requesterId  String    @map("requester_id")

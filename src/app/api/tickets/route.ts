@@ -9,10 +9,13 @@ import {
 } from "@/lib/auth";
 
 const createTicketSchema = z.object({
+  type: z.enum(["incidente", "requerimiento"]).default("incidente"),
   title: z.string().min(1).max(200),
   description: z.string().min(1),
-  priority: z.string().default("Media"),
-  category: z.string().optional(),
+  priorityId: z.string().min(1),
+  categoryId: z.string().optional(),
+  assigneeId: z.string().optional(),
+  requesterId: z.string().optional(), // override: reportar en nombre de otro usuario
 });
 
 export async function GET(req: NextRequest) {
@@ -66,7 +69,6 @@ export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
 
-    // Auditor no puede crear tickets
     if (session.role === ROLES.AUDITOR) {
       throw new ForbiddenError("Los auditores no pueden crear tickets");
     }
@@ -74,17 +76,17 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data = createTicketSchema.parse(body);
 
+    // Solo Admin/Supervisor pueden reportar en nombre de otro usuario
+    const canOverrideRequester = [ROLES.ADMIN, ROLES.SUPERVISOR].includes(session.role as typeof ROLES.ADMIN);
+    const requesterId = (canOverrideRequester && data.requesterId) ? data.requesterId : session.userId;
+
     const [priorityRecord, statusRecord] = await Promise.all([
-      prisma.cfgPriority.findFirst({ where: { name: data.priority } }),
+      prisma.cfgPriority.findUnique({ where: { id: data.priorityId } }),
       prisma.cfgStatus.findFirst({ where: { name: "Nuevo" } }),
     ]);
 
-    if (!priorityRecord || !statusRecord) {
-      return NextResponse.json(
-        { message: "Configuración de prioridad/estado no encontrada" },
-        { status: 400 }
-      );
-    }
+    if (!priorityRecord) return NextResponse.json({ message: "Prioridad no encontrada" }, { status: 400 });
+    if (!statusRecord)   return NextResponse.json({ message: "Estado 'Nuevo' no configurado en el sistema" }, { status: 400 });
 
     const count = await prisma.hdTicket.count();
     const ticketNumber = `HD-${String(count + 1).padStart(5, "0")}`;
@@ -92,22 +94,21 @@ export async function POST(req: NextRequest) {
     const ticket = await prisma.hdTicket.create({
       data: {
         ticketNumber,
+        type: data.type,
         title: data.title,
         description: data.description,
-        requesterId: session.userId,
+        requesterId,
         priorityId: priorityRecord.id,
         statusId: statusRecord.id,
+        assigneeId: data.assigneeId || null,
+        categoryId: data.categoryId || null,
         createdBy: session.userId,
-        ...(data.category
-          ? {
-              category: {
-                connectOrCreate: {
-                  where: { name: data.category },
-                  create: { name: data.category },
-                },
-              },
-            }
-          : {}),
+      },
+      include: {
+        requester: { select: { name: true, lastname: true } },
+        priority: true,
+        status: true,
+        category: true,
       },
     });
 
@@ -120,15 +121,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: error.message }, { status: 403 });
     }
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: "Datos inválidos", errors: error.issues },
-        { status: 400 }
-      );
+      return NextResponse.json({ message: "Datos inválidos", errors: error.issues }, { status: 400 });
     }
     console.error("[TICKETS POST]", error);
-    return NextResponse.json(
-      { message: "Error interno del servidor" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Error interno del servidor" }, { status: 500 });
   }
 }
