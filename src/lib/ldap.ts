@@ -1,4 +1,6 @@
 import { Client } from "ldapts";
+import { prisma } from "@/lib/prisma";
+import { decrypt } from "@/lib/crypto";
 
 export interface LdapUser {
   dn: string;
@@ -9,49 +11,107 @@ export interface LdapUser {
   memberOf: string[];
 }
 
-function isLdapConfigured(): boolean {
-  return !!(
-    process.env.LDAP_URL &&
-    process.env.LDAP_BASE_DN &&
-    process.env.LDAP_BIND_DN &&
-    process.env.LDAP_BIND_PASSWORD &&
-    process.env.LDAP_DOMAIN
-  );
+export interface LdapConfig {
+  enabled:         boolean;
+  url:             string;
+  domain:          string;
+  baseDn:          string;
+  bindDn:          string;
+  bindPassword:    string;
+  groupAdmin:      string;
+  groupSupervisor: string;
+  groupTecnico:    string;
+  groupAuditor:    string;
+  roleDefault:     string;
+}
+
+/**
+ * Lee la config LDAP desde la DB (con fallback a variables de entorno).
+ */
+export async function getLdapConfig(): Promise<LdapConfig> {
+  try {
+    const row = await prisma.sysConfig.findUnique({ where: { id: "main" } });
+    const db  = (row?.ldap ?? {}) as Record<string, unknown>;
+
+    if (db.url) {
+      let bindPassword = "";
+      if (db.bindPasswordEnc && db.bindPasswordIv) {
+        try { bindPassword = decrypt(db.bindPasswordEnc as string, db.bindPasswordIv as string); }
+        catch { bindPassword = ""; }
+      }
+      return {
+        enabled:         !!(db.enabled),
+        url:             (db.url             as string) || "",
+        domain:          (db.domain          as string) || "",
+        baseDn:          (db.baseDn          as string) || "",
+        bindDn:          (db.bindDn          as string) || "",
+        bindPassword,
+        groupAdmin:      (db.groupAdmin      as string) || "",
+        groupSupervisor: (db.groupSupervisor as string) || "",
+        groupTecnico:    (db.groupTecnico    as string) || "",
+        groupAuditor:    (db.groupAuditor    as string) || "",
+        roleDefault:     (db.roleDefault     as string) || "Usuario Final",
+      };
+    }
+  } catch { /* fallback a env */ }
+
+  // Fallback a variables de entorno
+  return {
+    enabled:         process.env.LDAP_ENABLED === "true",
+    url:             process.env.LDAP_URL             || "",
+    domain:          process.env.LDAP_DOMAIN          || "",
+    baseDn:          process.env.LDAP_BASE_DN         || "",
+    bindDn:          process.env.LDAP_BIND_DN         || "",
+    bindPassword:    process.env.LDAP_BIND_PASSWORD   || "",
+    groupAdmin:      process.env.LDAP_GROUP_ADMIN      || "",
+    groupSupervisor: process.env.LDAP_GROUP_SUPERVISOR || "",
+    groupTecnico:    process.env.LDAP_GROUP_TECNICO    || "",
+    groupAuditor:    process.env.LDAP_GROUP_AUDITOR    || "",
+    roleDefault:     process.env.LDAP_ROLE_DEFAULT     || "Usuario Final",
+  };
 }
 
 /**
  * Mapea los grupos AD del usuario a un rol del sistema.
- * Busca coincidencia en orden de prioridad descendente.
  */
-export function mapLdapGroupsToRole(memberOf: string[]): string {
+export function mapLdapGroupsToRole(memberOf: string[], config?: LdapConfig): string {
   const groups = memberOf.map((g) => g.toLowerCase());
+  const check = (val: string | undefined) =>
+    val ? groups.some((g) => g.includes(val.toLowerCase())) : false;
 
-  const check = (envVar: string | undefined) =>
-    envVar ? groups.some((g) => g.includes(envVar.toLowerCase())) : false;
+  if (config) {
+    if (check(config.groupAdmin))      return "Administrador";
+    if (check(config.groupSupervisor)) return "Supervisor";
+    if (check(config.groupTecnico))    return "Técnico";
+    if (check(config.groupAuditor))    return "Auditor";
+    return config.roleDefault || "Usuario Final";
+  }
 
   if (check(process.env.LDAP_GROUP_ADMIN))      return "Administrador";
   if (check(process.env.LDAP_GROUP_SUPERVISOR)) return "Supervisor";
   if (check(process.env.LDAP_GROUP_TECNICO))    return "Técnico";
   if (check(process.env.LDAP_GROUP_AUDITOR))    return "Auditor";
-
   return process.env.LDAP_ROLE_DEFAULT ?? "Usuario Final";
 }
 
 /**
  * Autentica un usuario contra Active Directory.
- * Retorna los datos del usuario o null si falla.
+ * Acepta config explícita o lee desde DB/env si no se provee.
  */
 export async function authenticateWithLdap(
   username: string,
-  password: string
+  password: string,
+  config?: LdapConfig
 ): Promise<LdapUser | null> {
-  if (!isLdapConfigured()) return null;
+  const cfg = config ?? await getLdapConfig();
+  if (!cfg.enabled || !cfg.url || !cfg.baseDn || !cfg.bindDn || !cfg.bindPassword || !cfg.domain)
+    return null;
 
-  const url        = process.env.LDAP_URL!;
-  const baseDn     = process.env.LDAP_BASE_DN!;
-  const domain     = process.env.LDAP_DOMAIN!;
-  const bindDn     = process.env.LDAP_BIND_DN!;
-  const bindPwd    = process.env.LDAP_BIND_PASSWORD!;
+  const url     = cfg.url;
+  const baseDn  = cfg.baseDn;
+  const domain  = cfg.domain;
+  const bindDn  = cfg.bindDn;
+  const bindPwd = cfg.bindPassword;
 
   // Normalizar username: acepta "user", "DOMAIN\user" o "user@domain.com"
   const samAccount = username.includes("\\")

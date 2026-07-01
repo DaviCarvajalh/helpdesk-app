@@ -383,6 +383,19 @@ model KbProcedureStep {
 }
 
 // ──────────────────────────────────────────
+// DOMAIN: sys_ (System Config)
+// ──────────────────────────────────────────
+
+model SysConfig {
+  id        String   @id @default("main")
+  ldap      Json?
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("sys_config")
+}
+
+// ──────────────────────────────────────────
 // DOMAIN: aud_ (Audit)
 // ──────────────────────────────────────────
 

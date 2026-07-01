@@ -3,7 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signToken } from "@/lib/jwt";
-import { authenticateWithLdap, mapLdapGroupsToRole } from "@/lib/ldap";
+import { authenticateWithLdap, mapLdapGroupsToRole, getLdapConfig } from "@/lib/ldap";
 
 // Acepta email completo o usuario de red (ej: "jperez" o "DOMINIO\jperez")
 const loginSchema = z.object({
@@ -21,8 +21,9 @@ export async function POST(req: NextRequest) {
     const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8;
 
     // ─── Intento LDAP (si está habilitado) ─────────────────────────────
-    if (process.env.LDAP_ENABLED === "true") {
-      const ldapUser = await authenticateWithLdap(identifier, password);
+    const ldapCfg = await getLdapConfig();
+    if (ldapCfg.enabled) {
+      const ldapUser = await authenticateWithLdap(identifier, password, ldapCfg);
 
       if (ldapUser) {
         // Auto-provisionar o recuperar usuario en la DB
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
 
         if (!dbUser) {
           // Primer login con AD: crear usuario
-          const roleName = mapLdapGroupsToRole(ldapUser.memberOf);
+          const roleName = mapLdapGroupsToRole(ldapUser.memberOf, ldapCfg);
           const role = await prisma.secRole.findUnique({ where: { name: roleName } });
 
           if (!role) {
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ message: "Cuenta desactivada" }, { status: 401 });
         } else {
           // Sincronizar rol con AD en cada login
-          const roleName = mapLdapGroupsToRole(ldapUser.memberOf);
+          const roleName = mapLdapGroupsToRole(ldapUser.memberOf, ldapCfg);
           const role = await prisma.secRole.findUnique({ where: { name: roleName } });
           if (role && role.id !== dbUser.roleId) {
             await prisma.secUser.update({
