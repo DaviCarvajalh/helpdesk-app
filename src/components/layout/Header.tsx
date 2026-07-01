@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Bell, ChevronDown, Search, LogOut, User,
-  AlertTriangle, XCircle, FileText, Shield, Inbox,
+  AlertTriangle, XCircle, FileText, Shield, Inbox, Menu,
 } from "lucide-react";
+import { useMobileMenu } from "@/context/MobileMenuContext";
 
 interface NotifItem {
   type: string; label: string; sub: string; href: string; level: "error" | "warn";
@@ -27,6 +28,7 @@ const TYPE_ICON: Record<string, React.ElementType> = {
 
 export default function Header() {
   const router = useRouter();
+  const { toggle } = useMobileMenu();
 
   const [me,        setMe]        = useState<Me | null>(null);
   const [notifs,    setNotifs]    = useState<NotifItem[]>([]);
@@ -61,7 +63,13 @@ export default function Header() {
   const total = notifs.length;
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0 z-30">
+    <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 flex items-center justify-between shrink-0 z-30">
+      {/* Hamburger — solo móvil */}
+      <button onClick={toggle}
+        className="md:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors mr-2">
+        <Menu size={20} />
+      </button>
+
       {/* Search */}
       <div className="relative hidden md:block">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
