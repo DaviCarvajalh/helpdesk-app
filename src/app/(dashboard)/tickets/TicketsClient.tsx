@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -37,28 +37,28 @@ export default function TicketsClient() {
   const [search,  setSearch]  = useState("");
   const [statusFilter,   setStatusFilter]   = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (q: string) => {
     setLoading(true);
     const params = new URLSearchParams();
     if (statusFilter)   params.set("status",   statusFilter);
     if (priorityFilter) params.set("priority", priorityFilter);
+    if (q)              params.set("q",         q);
     const res = await fetch(`/api/tickets?${params}`);
     if (res.ok) setTickets((await res.json()).tickets);
     setLoading(false);
   }, [statusFilter, priorityFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(search); }, [load]);
 
-  const filtered = tickets.filter((t) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      t.ticketNumber.toLowerCase().includes(q) ||
-      t.title.toLowerCase().includes(q) ||
-      `${t.requester?.name} ${t.requester?.lastname}`.toLowerCase().includes(q)
-    );
-  });
+  function handleSearch(val: string) {
+    setSearch(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => load(val), 350);
+  }
+
+  const filtered = tickets;
 
   return (
     <div className="flex-1 p-6 overflow-auto">
@@ -85,7 +85,7 @@ export default function TicketsClient() {
         <div className="flex flex-wrap gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+            <input type="text" value={search} onChange={(e) => handleSearch(e.target.value)}
               placeholder="Buscar tickets..."
               className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
           </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
+import { ROLES } from "@/lib/auth";
 import Header from "@/components/layout/Header";
 import Link from "next/link";
 import {
@@ -62,7 +63,7 @@ async function getStats() {
     }),
 
     prisma.secUser.findMany({
-      where: { role: { name: { in: ["Técnico", "Supervisor"] } }, isActive: true, deletedAt: null },
+      where: { role: { name: { in: [ROLES.TECNICO, ROLES.SUPERVISOR] } }, isActive: true, deletedAt: null },
       select: {
         id: true, name: true, lastname: true,
         _count: { select: { ticketsAssigned: { where: { deletedAt: null, status: { isClosed: false } } } } },
@@ -75,8 +76,8 @@ async function getStats() {
     prisma.invAsset.count({ where: { deletedAt: null, status: "maintenance" } }),
     prisma.invAsset.count({ where: { deletedAt: null } }),
 
-    // Contratos
-    prisma.hdContract.count({ where: { deletedAt: null, status: "active" } }),
+    // Contratos (solo los que no han vencido aún)
+    prisma.hdContract.count({ where: { deletedAt: null, status: "active", endDate: { gte: now } } }),
     prisma.hdContract.count({ where: { deletedAt: null, status: "active", endDate: { gt: now, lt: in7 } } }),
 
     // KB
@@ -87,7 +88,7 @@ async function getStats() {
 
     // Contratos por vencer en 30 días (para lista)
     prisma.hdContract.findMany({
-      where: { deletedAt: null, status: "active", endDate: { gt: now, lt: in30 } },
+      where: { deletedAt: null, status: { not: "cancelled" }, endDate: { gt: now, lt: in30 } },
       select: { id: true, contractNumber: true, endDate: true, customer: { select: { name: true } } },
       orderBy: { endDate: "asc" },
       take: 4,

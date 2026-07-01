@@ -23,8 +23,9 @@ export async function GET(req: NextRequest) {
   try {
     const session = await requireSession();
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status");
+    const status   = searchParams.get("status");
     const priority = searchParams.get("priority");
+    const q        = searchParams.get("q")?.trim() ?? "";
 
     // Usuario Final solo puede ver sus propios tickets
     const ownerFilter =
@@ -36,8 +37,16 @@ export async function GET(req: NextRequest) {
       where: {
         deletedAt: null,
         ...ownerFilter,
-        ...(status ? { status: { name: status } } : {}),
+        ...(status   ? { status:   { name: status }   } : {}),
         ...(priority ? { priority: { name: priority } } : {}),
+        ...(q ? {
+          OR: [
+            { title:        { contains: q, mode: "insensitive" } },
+            { ticketNumber: { contains: q, mode: "insensitive" } },
+            { description:  { contains: q, mode: "insensitive" } },
+            { requester: { name: { contains: q, mode: "insensitive" } } },
+          ],
+        } : {}),
       },
       include: {
         requester: { select: { name: true, lastname: true } },
