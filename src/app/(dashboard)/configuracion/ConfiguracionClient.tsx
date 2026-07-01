@@ -1,17 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Users, Tag, AlertTriangle, CircleDot } from "lucide-react";
+import { Users, Tag, AlertTriangle, CircleDot, Shield } from "lucide-react";
 import UsuariosTab from "./tabs/UsuariosTab";
 import CategoriasTab from "./tabs/CategoriasTab";
 import PrioridadesTab from "./tabs/PrioridadesTab";
 import EstadosTab from "./tabs/EstadosTab";
+import LdapTab from "./tabs/LdapTab";
 
 const TABS = [
-  { id: "usuarios",    label: "Usuarios",    icon: Users,        component: UsuariosTab },
-  { id: "categorias",  label: "Categorías",  icon: Tag,          component: CategoriasTab },
-  { id: "prioridades", label: "Prioridades", icon: AlertTriangle, component: PrioridadesTab },
-  { id: "estados",     label: "Estados",     icon: CircleDot,    component: EstadosTab },
+  { id: "usuarios",    label: "Usuarios",         icon: Users,         component: UsuariosTab },
+  { id: "categorias",  label: "Categorías",        icon: Tag,           component: CategoriasTab },
+  { id: "prioridades", label: "Prioridades",       icon: AlertTriangle, component: PrioridadesTab },
+  { id: "estados",     label: "Estados",           icon: CircleDot,     component: EstadosTab },
+  { id: "ldap",        label: "Active Directory",  icon: Shield,        component: LdapTab },
 ];
 
 export default function ConfiguracionClient() {
