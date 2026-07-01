@@ -118,16 +118,18 @@ async function main() {
   console.log(`✅ ${categories.length} categorías creadas`);
 
   // ── sec_user (admin) ────────────────────────────────
-  const adminRole = roles.find((r) => r.name === "Administrador")!;
-  const hashedPassword = await bcrypt.hash("Admin1234!", 12);
+  const adminRole    = roles.find((r) => r.name === "Administrador")!;
+  const adminEmail   = process.env.ADMIN_EMAIL    ?? "admin@helpdesk.cl";
+  const adminPwd     = process.env.ADMIN_PASSWORD ?? "Admin1234!";
+  const hashedPassword = await bcrypt.hash(adminPwd, 12);
 
   const admin = await prisma.secUser.upsert({
-    where: { email: "admin@helpdesk.cl" },
+    where: { email: adminEmail },
     update: {},
     create: {
       name: "Admin",
       lastname: "HelpDesk",
-      email: "admin@helpdesk.cl",
+      email: adminEmail,
       passwordHash: hashedPassword,
       roleId: adminRole.id,
     },
