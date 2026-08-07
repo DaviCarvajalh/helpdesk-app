@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   requireSession,
@@ -98,35 +99,54 @@ export async function POST(req: NextRequest) {
     if (!priorityRecord) return NextResponse.json({ message: "Prioridad no encontrada" }, { status: 400 });
     if (!statusRecord)   return NextResponse.json({ message: "Estado 'Nuevo' no configurado en el sistema" }, { status: 400 });
 
-    const count = await prisma.hdTicket.count();
-    const ticketNumber = `HD-${String(count + 1).padStart(5, "0")}`;
+    const priority = priorityRecord;
+    const status = statusRecord;
 
     // SLA deadline: ahora + resolveTime horas de la prioridad
-    const slaDeadline = priorityRecord.resolveTime > 0
-      ? new Date(Date.now() + priorityRecord.resolveTime * 60 * 60 * 1000)
+    const slaDeadline = priority.resolveTime > 0
+      ? new Date(Date.now() + priority.resolveTime * 60 * 60 * 1000)
       : null;
 
-    const ticket = await prisma.hdTicket.create({
-      data: {
-        ticketNumber,
-        type: data.type,
-        title: data.title,
-        description: data.description,
-        requesterId,
-        priorityId: priorityRecord.id,
-        statusId: statusRecord.id,
-        assigneeId: data.assigneeId || null,
-        categoryId: data.categoryId || null,
-        slaDeadline,
-        createdBy: session.userId,
-      } as Parameters<typeof prisma.hdTicket.create>[0]["data"],
-      include: {
-        requester: { select: { name: true, lastname: true } },
-        priority: true,
-        status: true,
-        category: true,
-      },
-    });
+    // El ticketNumber tiene un índice @unique. Ante creaciones concurrentes
+    // dos peticiones podrían calcular el mismo número, por lo que reintentamos
+    // si Prisma lanza P2002 (violación de restricción única).
+    async function createTicketWithNumber() {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const count = await prisma.hdTicket.count();
+        const ticketNumber = `HD-${String(count + 1 + attempt).padStart(5, "0")}`;
+        try {
+          return await prisma.hdTicket.create({
+            data: {
+              ticketNumber,
+              type: data.type,
+              title: data.title,
+              description: data.description,
+              requesterId,
+              priorityId: priority.id,
+              statusId: status.id,
+              assigneeId: data.assigneeId || null,
+              categoryId: data.categoryId || null,
+              slaDeadline,
+              createdBy: session.userId,
+            } as Parameters<typeof prisma.hdTicket.create>[0]["data"],
+            include: {
+              requester: { select: { name: true, lastname: true } },
+              priority: true,
+              status: true,
+              category: true,
+            },
+          });
+        } catch (err) {
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+            continue; // colisión de ticketNumber → reintentar
+          }
+          throw err;
+        }
+      }
+      throw new Error("No se pudo generar un número de ticket único tras varios intentos");
+    }
+
+    const ticket = await createTicketWithNumber();
 
     // Email al solicitante (fire-and-forget)
     prisma.secUser.findUnique({ where: { id: requesterId }, select: { email: true, name: true, lastname: true } })
@@ -134,7 +154,7 @@ export async function POST(req: NextRequest) {
         if (u?.email) sendTicketCreated({
           to: u.email, name: `${u.name} ${u.lastname}`,
           ticketNumber: ticket.ticketNumber, ticketId: ticket.id,
-          title: ticket.title, priority: priorityRecord.name,
+          title: ticket.title, priority: priority.name,
         });
       }).catch(() => {});
 

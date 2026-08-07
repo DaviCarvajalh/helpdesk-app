@@ -3,12 +3,13 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireRole, ForbiddenError, UnauthorizedError, ROLES } from "@/lib/auth";
+import { passwordSchema } from "@/lib/validation";
 
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   lastname: z.string().min(1).max(100),
   email: z.string().email(),
-  password: z.string().min(6),
+  password: passwordSchema,
   roleId: z.string().min(1),
   isActive: z.boolean().optional().default(true),
 });

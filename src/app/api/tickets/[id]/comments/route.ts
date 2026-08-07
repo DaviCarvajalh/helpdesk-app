@@ -19,7 +19,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       throw new ForbiddenError("Sin permisos para notas internas");
     }
 
-    const ticket = await prisma.hdTicket.findFirst({ where: { id: params.id, deletedAt: null } });
+    const ticket = await prisma.hdTicket.findFirst({
+      where: {
+        id: params.id,
+        deletedAt: null,
+        // Usuario Final solo puede comentar sus propios tickets
+        ...(session.role === ROLES.USUARIO ? { requesterId: session.userId } : {}),
+      },
+    });
     if (!ticket) return NextResponse.json({ message: "Ticket no encontrado" }, { status: 404 });
 
     const comment = await prisma.hdTicketComment.create({

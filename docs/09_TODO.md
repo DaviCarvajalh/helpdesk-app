@@ -13,11 +13,11 @@
 
 ## 🔴 Alta prioridad
 
-- [ ] Ticket detalle `/tickets/[id]` — metadata, descripción, SLA timer
-- [ ] Comentarios de ticket — internos y externos
-- [ ] Historial de cambios automático (trigger en API)
-- [ ] RBAC en API routes — verificar rol además de autenticación
-- [ ] Asignación de técnico a ticket
+- [x] Ticket detalle `/tickets/[id]` — metadata, descripción, SLA timer
+- [x] Comentarios de ticket — internos y externos (con control de propiedad)
+- [x] Historial de cambios automático (en API PATCH)
+- [x] RBAC en API routes — verificar rol además de autenticación
+- [x] Asignación de técnico a ticket
 
 ---
 
@@ -37,5 +37,5 @@
 - [ ] Reportes — gráficas y exportación CSV
 - [ ] Configuración — gestión de usuarios, roles, estados
 - [ ] Refresh token / sesión extendida
-- [ ] Health check endpoint `/api/health`
+- [x] Health check endpoint `/api/health`
 - [ ] Tests unitarios de API routes

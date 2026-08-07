@@ -27,7 +27,7 @@ Toda funcionalidad se diseña con seguridad desde el inicio, no como capa poster
 |---|---|---|
 | Hash algoritmo | bcrypt | ✅ |
 | Salt rounds | 12 | ✅ |
-| Complejidad mínima | 8 chars, mayúscula, número, especial | 🟡 Solo validación cliente |
+| Complejidad mínima | 8 chars, mayúscula, número, especial | ✅ Validación en servidor (`lib/validation.ts`) |
 | Sin reversibilidad | Solo hash almacenado | ✅ |
 
 ---
@@ -41,8 +41,8 @@ Roles definidos:
 - `Usuario Final` — Solo sus propios tickets
 - `Auditor` — Solo lectura
 
-**Estado actual:** 🔴 Solo verifica autenticación. Sin verificación de rol en API routes.  
-**Pendiente:** Middleware de autorización por recurso.
+**Estado actual:** ✅ Autorización por rol implementada (`requireRole` / `requireSession` en `lib/auth.ts`). Los Usuarios Finales solo acceden a sus propios tickets (filtro por `requesterId`).  
+**Pendiente:** Centralizar reglas por recurso y ampliar cobertura de tests.
 
 ---
 
@@ -69,7 +69,7 @@ ENCRYPTION_KEY=        # Exactamente 32 bytes (hex o base64)
 
 | Vulnerabilidad | Mitigación | Estado |
 |---|---|---|
-| A01 Broken Access Control | RBAC + middleware | 🔴 Parcial |
+| A01 Broken Access Control | RBAC + ownership por recurso | ✅ |
 | A02 Cryptographic Failures | bcrypt + AES-256 + HTTPS | 🟡 Parcial |
 | A03 Injection | Prisma ORM (parameterized) + Zod | ✅ |
 | A04 Insecure Design | Secure by Design | 🟡 En progreso |

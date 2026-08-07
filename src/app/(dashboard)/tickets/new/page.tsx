@@ -193,7 +193,7 @@ export default function NewTicketPage() {
                   <select value={form.priorityId}
                     onChange={(e) => setForm({ ...form, priorityId: e.target.value })} required
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                    <option value=""></option>
+                    <option value="">Seleccionar...</option>
                     {priorities.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
