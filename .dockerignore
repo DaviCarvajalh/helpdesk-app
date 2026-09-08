@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.env
+.env.local
+*.log
+docs
+_tmp_*
+Disco local (C) - Acceso directo.lnk

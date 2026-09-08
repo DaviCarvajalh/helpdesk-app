@@ -1,5 +1,48 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Producción con Docker
+
+**Instalación inicial** (en `/opt/ignisterra/helpdesk`):
+```bash
+cp .env.example .env
+nano .env   # POSTGRES_PASSWORD, JWT_SECRET, ENCRYPTION_KEY, APP_URL
+docker compose build
+docker compose up -d
+docker compose exec app npx prisma migrate deploy
+```
+
+> El seed inicial (`npm run db:seed`) requiere `ts-node`, no incluido en la imagen de producción (standalone).
+> Ejecútalo una sola vez desde un entorno con Node+deps completas apuntando al `DATABASE_URL` de producción,
+> o crea el usuario admin manualmente en la tabla `sec_user`.
+
+**Comandos**
+```bash
+docker compose build      # construir imágenes
+docker compose up -d      # iniciar
+docker compose ps         # verificar
+docker compose logs -f    # logs (o: docker logs helpdesk-app-1)
+docker compose down       # detener
+```
+
+**Actualizar versión**
+```bash
+git pull
+docker compose build
+docker compose up -d
+docker compose exec app npx prisma migrate deploy
+```
+
+**Backup / Restore (Postgres)**
+```bash
+# Backup
+docker compose exec db pg_dump -U helpdesk helpdesk > backup_$(date +%F).sql
+
+# Restore
+cat backup_YYYY-MM-DD.sql | docker compose exec -T db psql -U helpdesk -d helpdesk
+```
+
+App accesible en `http://172.20.2.133:3000` (temporal, hasta configurar reverse proxy + DNS `helpdesk.ignisterra.cl`).
+
 ## Getting Started
 
 First, run the development server:
