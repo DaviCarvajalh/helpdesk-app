@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
 import {
-  ArrowLeft, Plus, Trash2, GripVertical, AlertTriangle, ChevronDown,
+  ArrowLeft, Plus, Trash2, AlertTriangle, ChevronDown,
 } from "lucide-react";
 
 interface Step {

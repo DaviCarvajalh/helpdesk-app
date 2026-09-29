@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Plus, Search, Monitor, Server, Cpu, HardDrive,
-  CheckCircle2, AlertTriangle, Archive, Wrench,
+  CheckCircle2, Archive, Wrench,
 } from "lucide-react";
 
 const ASSET_CATEGORIES = ["PC", "Notebook", "Servidor", "Switch", "Router", "Impresora", "Monitor", "UPS", "Teléfono", "Otro"];

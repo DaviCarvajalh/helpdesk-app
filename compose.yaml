@@ -30,12 +30,42 @@ services:
       APP_URL: ${APP_URL}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
+      LDAP_ENABLED: ${LDAP_ENABLED:-false}
+      LDAP_URL: ${LDAP_URL:-}
+      LDAP_DOMAIN: ${LDAP_DOMAIN:-}
+      LDAP_BASE_DN: ${LDAP_BASE_DN:-}
+      LDAP_BIND_DN: ${LDAP_BIND_DN:-}
+      LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD:-}
+      LDAP_GROUP_ADMIN: ${LDAP_GROUP_ADMIN:-}
+      LDAP_GROUP_SUPERVISOR: ${LDAP_GROUP_SUPERVISOR:-}
+      LDAP_GROUP_TECNICO: ${LDAP_GROUP_TECNICO:-}
+      LDAP_GROUP_AUDITOR: ${LDAP_GROUP_AUDITOR:-}
+      LDAP_ROLE_DEFAULT: ${LDAP_ROLE_DEFAULT:-Usuario Final}
     ports:
       - "172.20.2.133:3000:3000"
     volumes:
       - uploads_data:/app/public/uploads
     networks:
       - internal
+
+  # Servicio one-off para el seed inicial (roles, prioridades, estados, admin).
+  # No se inicia con `docker compose up`. Ejecutar manualmente una sola vez:
+  #   docker compose --profile tools run --rm seed
+  seed:
+    build:
+      context: .
+      target: builder
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    networks:
+      - internal
+    entrypoint: ["npx", "prisma", "db", "seed"]
 
 networks:
   internal:

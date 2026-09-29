@@ -2,34 +2,46 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Producción con Docker
 
-**Instalación inicial** (en `/opt/ignisterra/helpdesk`):
+Despliegue reproducible en servidor limpio (Ubuntu Server + Docker + Docker Compose):
+
 ```bash
+git clone <repo-url> helpdesk-app
+cd helpdesk-app
 cp .env.example .env
-nano .env   # POSTGRES_PASSWORD, JWT_SECRET, ENCRYPTION_KEY, APP_URL
+nano .env   # completar POSTGRES_PASSWORD, JWT_SECRET, ENCRYPTION_KEY, APP_URL (ver comentarios en el archivo)
+
 docker compose build
 docker compose up -d
-docker compose exec app npx prisma migrate deploy
 ```
 
-> El seed inicial (`npm run db:seed`) requiere `ts-node`, no incluido en la imagen de producción (standalone).
-> Ejecútalo una sola vez desde un entorno con Node+deps completas apuntando al `DATABASE_URL` de producción,
-> o crea el usuario admin manualmente en la tabla `sec_user`.
+Con esto la aplicación queda funcionando en `http://<APP_URL>` (o `http://172.20.2.133:3000` según `compose.yaml`).
+**Las migraciones de Prisma se aplican automáticamente** al iniciar el contenedor `app`
+(ver `docker-entrypoint.sh` → `prisma migrate deploy`, idempotente, se ejecuta en cada arranque sin efecto si ya están aplicadas).
+No es necesario ejecutar `npx prisma migrate deploy` manualmente.
+
+**Seed inicial (opcional, solo primera vez)** — crea roles, prioridades, estados y el usuario administrador.
+Se ejecuta con un servicio dedicado (usa el stage `builder`, que incluye `ts-node`; el contenedor `app` en producción no lo necesita):
+```bash
+docker compose --profile tools run --rm seed
+```
+Credenciales por defecto si no defines `ADMIN_EMAIL`/`ADMIN_PASSWORD` en `.env`: `admin@helpdesk.cl` / `Admin1234!` — **cámbiala inmediatamente**.
+El seed usa `upsert`, por lo que ejecutarlo más de una vez es seguro (no duplica datos).
 
 **Comandos**
 ```bash
-docker compose build      # construir imágenes
-docker compose up -d      # iniciar
-docker compose ps         # verificar
-docker compose logs -f    # logs (o: docker logs helpdesk-app-1)
-docker compose down       # detener
+docker compose build                        # construir imágenes
+docker compose up -d                         # iniciar (migra automáticamente)
+docker compose ps                            # verificar estado
+docker compose logs -f app                   # logs de la app
+docker compose --profile tools run --rm seed # seed inicial (una sola vez)
+docker compose down                          # detener
 ```
 
 **Actualizar versión**
 ```bash
 git pull
 docker compose build
-docker compose up -d
-docker compose exec app npx prisma migrate deploy
+docker compose up -d   # recrea el contenedor y aplica migraciones nuevas automáticamente
 ```
 
 **Backup / Restore (Postgres)**

@@ -4,8 +4,6 @@ import crypto from "crypto";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const schema = z.object({
   email: z.string().email(),
 });
@@ -40,37 +38,42 @@ export async function POST(req: NextRequest) {
       data: { userId: user.id, token, expiresAt },
     });
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const appUrl = process.env.APP_URL ?? "http://localhost:3000";
     const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
-    const { error: emailError } = await resend.emails.send({
-      from: process.env.RESEND_FROM ?? "HelpDesk <noreply@tudominio.com>",
-      to: user.email,
-      subject: "Restablecer contraseña — HelpDesk",
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
-          <h2 style="color:#10b981;margin-bottom:8px;">HelpDesk</h2>
-          <p style="color:#374151;">Hola <strong>${user.name}</strong>,</p>
-          <p style="color:#374151;">Recibimos una solicitud para restablecer tu contraseña.
-          Haz clic en el botón para continuar. El enlace expira en <strong>1 hora</strong>.</p>
-          <a href="${resetUrl}"
-             style="display:inline-block;margin:24px 0;padding:12px 24px;
-                    background:#10b981;color:#fff;border-radius:8px;
-                    text-decoration:none;font-weight:600;">
-            Restablecer contraseña
-          </a>
-          <p style="color:#6b7280;font-size:13px;">
-            Si no solicitaste esto, ignora este mensaje. Tu contraseña no cambiará.
-          </p>
-          <p style="color:#6b7280;font-size:12px;margin-top:32px;border-top:1px solid #e5e7eb;padding-top:16px;">
-            © ${new Date().getFullYear()} ETL Technology · HelpDesk
-          </p>
-        </div>
-      `,
-    });
+    if (process.env.RESEND_API_KEY) {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const { error: emailError } = await resend.emails.send({
+        from: process.env.EMAIL_FROM ?? "HelpDesk <noreply@tudominio.com>",
+        to: user.email,
+        subject: "Restablecer contraseña — HelpDesk",
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+            <h2 style="color:#10b981;margin-bottom:8px;">HelpDesk</h2>
+            <p style="color:#374151;">Hola <strong>${user.name}</strong>,</p>
+            <p style="color:#374151;">Recibimos una solicitud para restablecer tu contraseña.
+            Haz clic en el botón para continuar. El enlace expira en <strong>1 hora</strong>.</p>
+            <a href="${resetUrl}"
+               style="display:inline-block;margin:24px 0;padding:12px 24px;
+                      background:#10b981;color:#fff;border-radius:8px;
+                      text-decoration:none;font-weight:600;">
+              Restablecer contraseña
+            </a>
+            <p style="color:#6b7280;font-size:13px;">
+              Si no solicitaste esto, ignora este mensaje. Tu contraseña no cambiará.
+            </p>
+            <p style="color:#6b7280;font-size:12px;margin-top:32px;border-top:1px solid #e5e7eb;padding-top:16px;">
+              © ${new Date().getFullYear()} ETL Technology · HelpDesk
+            </p>
+          </div>
+        `,
+      });
 
-    if (emailError) {
-      console.error("[FORGOT_PASSWORD] Resend error:", emailError);
+      if (emailError) {
+        console.error("[FORGOT_PASSWORD] Resend error:", emailError);
+      }
+    } else {
+      console.warn("[FORGOT_PASSWORD] RESEND_API_KEY no configurado; correo no enviado");
     }
 
     return genericResponse;

@@ -5,11 +5,12 @@ import Header from "@/components/layout/Header";
 import Link from "next/link";
 import {
   Plus, Inbox, Clock, UserX, CheckCircle2, TrendingUp, Users,
-  AlertTriangle, FileText, Monitor, Shield, BookOpen, Wrench,
+  FileText, Monitor, Shield, BookOpen, Wrench,
   XCircle, Package,
 } from "lucide-react";
 
 export const metadata: Metadata = { title: "Dashboard" };
+export const dynamic = "force-dynamic";
 
 const PRIORITY_COLOR: Record<string, string> = {
   Crítica: "bg-red-100 text-red-700",

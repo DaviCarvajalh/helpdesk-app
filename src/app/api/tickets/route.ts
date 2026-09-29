@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     // El ticketNumber tiene un índice @unique. Ante creaciones concurrentes
     // dos peticiones podrían calcular el mismo número, por lo que reintentamos
     // si Prisma lanza P2002 (violación de restricción única).
-    async function createTicketWithNumber() {
+    const createTicketWithNumber = async () => {
       for (let attempt = 0; attempt < 5; attempt++) {
         const count = await prisma.hdTicket.count();
         const ticketNumber = `HD-${String(count + 1 + attempt).padStart(5, "0")}`;
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
         }
       }
       throw new Error("No se pudo generar un número de ticket único tras varios intentos");
-    }
+    };
 
     const ticket = await createTicketWithNumber();
 

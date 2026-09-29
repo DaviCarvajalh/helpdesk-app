@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
 import Image from "next/image";
@@ -34,7 +34,6 @@ interface Ticket {
 
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router  = useRouter();
 
   const [ticket, setTicket]     = useState<Ticket | null>(null);
   const [loading, setLoading]   = useState(true);

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Plus, Search, ClipboardList, AlertTriangle, BookOpen, Globe, Lock,
+  Plus, Search, ClipboardList, BookOpen, Globe, Lock,
 } from "lucide-react";
 
 interface Step { id: string; order: number; title: string; }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession, UnauthorizedError, ForbiddenError, ROLES } from "@/lib/auth";
 import { authenticateWithLdap, getLdapConfig } from "@/lib/ldap";
 import { prisma } from "@/lib/prisma";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { encrypt } from "@/lib/crypto";
 
 export async function GET() {
   try {
