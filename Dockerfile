@@ -9,6 +9,14 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Next.js standalone output siempre espera copiar ./public en el stage runner.
+# El proyecto no incluye una carpeta public/ committeada (los uploads se crean
+# en runtime vía mkdir recursivo). Se garantiza su existencia aquí para que la
+# imagen sea robusta tanto ahora (carpeta vacía) como en el futuro, si se
+# agregan assets estáticos reales (favicon, logos, etc.) sin tocar el Dockerfile.
+RUN mkdir -p public
+
 RUN npx prisma generate
 RUN npm run build
 
@@ -23,6 +31,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
