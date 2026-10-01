@@ -16,12 +16,32 @@ services:
     networks:
       - internal
 
+  # Job de migración: aplica `prisma migrate deploy` usando el stage `builder`
+  # (npm ci completo, sin poda) para evitar depender de una copia manual del
+  # CLI de Prisma dentro de la imagen runtime minimizada. Se ejecuta una vez
+  # por cada `docker compose up`, antes de que arranque `app` (ver depends_on
+  # de `app` con condition: service_completed_successfully). Es idempotente.
+  migrate:
+    build:
+      context: .
+      target: builder
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    networks:
+      - internal
+    entrypoint: ["npx", "prisma", "migrate", "deploy"]
+
   app:
     build: .
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}

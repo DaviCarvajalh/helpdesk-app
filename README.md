@@ -15,9 +15,12 @@ docker compose up -d
 ```
 
 Con esto la aplicación queda funcionando en `http://<APP_URL>` (o `http://172.20.2.133:3000` según `compose.yaml`).
-**Las migraciones de Prisma se aplican automáticamente** al iniciar el contenedor `app`
-(ver `docker-entrypoint.sh` → `prisma migrate deploy`, idempotente, se ejecuta en cada arranque sin efecto si ya están aplicadas).
-No es necesario ejecutar `npx prisma migrate deploy` manualmente.
+**Las migraciones de Prisma se aplican automáticamente** mediante el servicio `migrate`
+(`compose.yaml`), que corre `prisma migrate deploy` usando el stage `builder` (instalación
+completa de Node, sin podar) y se ejecuta hasta completarse **antes** de que `app` arranque
+(`depends_on: migrate: condition: service_completed_successfully`). Es idempotente: si ya
+están aplicadas, termina sin cambios. No es necesario ejecutarlo manualmente ni copiar el
+CLI de Prisma dentro de la imagen runtime de la app (por diseño — ver comentarios en `Dockerfile`).
 
 **Seed inicial (opcional, solo primera vez)** — crea roles, prioridades, estados y el usuario administrador.
 Se ejecuta con un servicio dedicado (usa el stage `builder`, que incluye `ts-node`; el contenedor `app` en producción no lo necesita):
@@ -30,9 +33,10 @@ El seed usa `upsert`, por lo que ejecutarlo más de una vez es seguro (no duplic
 **Comandos**
 ```bash
 docker compose build                        # construir imágenes
-docker compose up -d                         # iniciar (migra automáticamente)
+docker compose up -d                         # iniciar (corre `migrate` y luego `app`)
 docker compose ps                            # verificar estado
 docker compose logs -f app                   # logs de la app
+docker compose logs migrate                  # logs de la última migración
 docker compose --profile tools run --rm seed # seed inicial (una sola vez)
 docker compose down                          # detener
 ```
