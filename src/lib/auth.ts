@@ -11,6 +11,18 @@ export const ROLES = {
 
 export type RoleName = (typeof ROLES)[keyof typeof ROLES];
 
+/**
+ * Si la cookie de sesión lleva el flag Secure. Los navegadores descartan
+ * cookies Secure recibidas por HTTP, así que solo se activa si la app se sirve
+ * por HTTPS: COOKIE_SECURE ("true"/"false") manda; si no, se deduce de APP_URL.
+ */
+export function isSessionCookieSecure(): boolean {
+  const flag = process.env.COOKIE_SECURE?.toLowerCase();
+  if (flag === "true")  return true;
+  if (flag === "false") return false;
+  return (process.env.APP_URL ?? "").toLowerCase().startsWith("https://");
+}
+
 export class UnauthorizedError extends Error {
   constructor(message = "No autenticado") {
     super(message);

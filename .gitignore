@@ -37,6 +37,9 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# adjuntos subidos por usuarios
+/uploads
+
 # Environment variables
 .env
 .env.local

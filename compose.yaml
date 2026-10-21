@@ -48,6 +48,7 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       APP_URL: ${APP_URL}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       LDAP_ENABLED: ${LDAP_ENABLED:-false}
@@ -64,7 +65,8 @@ services:
     ports:
       - "172.20.2.133:3000:3000"
     volumes:
-      - uploads_data:/app/public/uploads
+      # Mismo volumen que antes; solo cambia el punto de montaje (fuera de /public)
+      - uploads_data:/app/uploads
     networks:
       - internal
 

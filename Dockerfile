@@ -42,7 +42,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-RUN mkdir -p ./public/uploads && chown -R nextjs:nodejs ./public/uploads
+# Adjuntos fuera de /public: se sirven solo vía API con control de acceso
+RUN mkdir -p ./uploads && chown -R nextjs:nodejs ./uploads
+ENV UPLOADS_DIR=/app/uploads
 
 USER nextjs
 EXPOSE 3000

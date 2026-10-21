@@ -6,4 +6,6 @@ node_modules
 *.log
 docs
 _tmp_*
+uploads
+public/uploads
 Disco local (C) - Acceso directo.lnk

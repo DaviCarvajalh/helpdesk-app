@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readdir } from "fs/promises";
-import path from "path";
 import { requireSession, UnauthorizedError } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { attachmentUrl, findAccessibleTicket, isSafeFilename, ticketUploadDir } from "@/lib/attachments";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireSession();
+    const session = await requireSession();
 
-    const ticket = await prisma.hdTicket.findFirst({ where: { id: params.id, deletedAt: null } });
-    if (!ticket) return NextResponse.json({ urls: [] });
+    const dir = ticketUploadDir(params.id);
+    const ticket = dir ? await findAccessibleTicket(session, params.id) : null;
+    if (!dir || !ticket) return NextResponse.json({ urls: [] });
 
-    const dir = path.join(process.cwd(), "public", "uploads", "tickets", params.id);
     let files: string[] = [];
     try {
       const entries = await readdir(dir);
-      files = entries.map((f) => `/uploads/tickets/${params.id}/${f}`);
+      files = entries.filter(isSafeFilename).map((f) => attachmentUrl(params.id, f));
     } catch {
       // directorio no existe = sin adjuntos
     }
