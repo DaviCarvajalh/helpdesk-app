@@ -244,7 +244,8 @@ export default function TicketDetailPage() {
                     {attachments.map((url) => (
                       <a key={url} href={url} target="_blank" rel="noopener noreferrer"
                         className="block rounded-lg overflow-hidden border border-gray-100 hover:opacity-80 transition-opacity">
-                        <Image src={url} alt="adjunto" width={160} height={100}
+                        {/* unoptimized: la ruta exige la cookie de sesión del navegador */}
+                        <Image src={url} alt="adjunto" width={160} height={100} unoptimized
                           className="w-full h-24 object-cover" />
                       </a>
                     ))}

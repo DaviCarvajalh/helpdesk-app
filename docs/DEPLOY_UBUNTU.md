@@ -137,11 +137,8 @@ server {
         add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
-    # Adjuntos subidos
-    location /uploads {
-        alias /var/www/helpdesk/public/uploads;
-        expires 7d;
-    }
+    # Los adjuntos NO se sirven desde nginx: la app los entrega en
+    # /api/tickets/<id>/attachments/<archivo> validando sesión y permisos.
 }
 ```
 
@@ -228,5 +225,5 @@ chmod +x deploy.sh
 ## Notas de seguridad
 
 - El `.env` nunca debe estar en el repositorio (está en `.gitignore`)
-- Los adjuntos se guardan en `/var/www/helpdesk/public/uploads/` — incluir en backups
+- Los adjuntos se guardan en `/var/www/helpdesk/uploads/` (o `UPLOADS_DIR`) — incluir en backups
 - Backups de PostgreSQL: `pg_dump helpdesk > backup_$(date +%F).sql`

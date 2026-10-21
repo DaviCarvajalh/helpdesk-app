@@ -1,48 +1,59 @@
 # ── deps ─────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:20.20.2-bookworm-slim AS deps
 WORKDIR /app
-RUN apk add --no-cache openssl
+
+# openssl: librerías compartidas que Prisma Engine necesita en runtime/build.
+# ca-certificates: certificados raíz para conexiones HTTPS de npm/Prisma.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
 # ── build ────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:20.20.2-bookworm-slim AS builder
 WORKDIR /app
-RUN apk add --no-cache openssl
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Next.js standalone output siempre espera copiar ./public en el stage runner.
-# El proyecto no incluye una carpeta public/ committeada (los uploads se crean
-# en runtime vía mkdir recursivo). Se garantiza su existencia aquí para que la
-# imagen sea robusta tanto ahora (carpeta vacía) como en el futuro, si se
-# agregan assets estáticos reales (favicon, logos, etc.) sin tocar el Dockerfile.
+# Next.js standalone espera una carpeta public; el proyecto no la commitea.
 RUN mkdir -p public
 
-RUN npx prisma generate
+# package.json define build como: prisma generate && next build
 RUN npm run build
 
 # ── runtime ──────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:20.20.2-bookworm-slim AS runner
 WORKDIR /app
-RUN apk add --no-cache openssl
 ENV NODE_ENV=production
 
-RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-# .prisma (cliente generado) y @prisma/client son los únicos artefactos de
-# Prisma que la app necesita en runtime para ejecutar queries. El CLI `prisma`
-# (migrate/seed) y la carpeta prisma/ (schema + migrations) deliberadamente NO
-# se copian aquí: el CLI no es reubicable de forma confiable fuera de una
-# instalación completa (ver servicios `migrate` y `seed` en compose.yaml, que
-# usan el stage `builder` con npm ci sin podar para ese propósito).
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+# Usuario no-root con uid/gid 1001 para compatibilidad con el volumen uploads
+# creado por la versión anterior (Alpine usaba nextjs:nodejs 1001:1001).
+RUN groupadd -g 1001 nextjs && \
+    useradd -u 1001 -g nextjs -s /bin/bash -M nextjs
 
-RUN mkdir -p ./public/uploads && chown -R nextjs:nodejs ./public/uploads
+COPY --from=builder --chown=nextjs:nextjs /app/public ./public
+COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nextjs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nextjs /app/node_modules/@prisma ./node_modules/@prisma
+
+# Adjuntos fuera de /public: se sirven solo vía API con control de acceso
+RUN mkdir -p ./uploads && chown -R nextjs:nextjs ./uploads
+ENV UPLOADS_DIR=/app/uploads
 
 USER nextjs
 EXPOSE 3000

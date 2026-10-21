@@ -3,6 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signToken } from "@/lib/jwt";
+import { isSessionCookieSecure } from "@/lib/auth";
 import { authenticateWithLdap, mapLdapGroupsToRole, getLdapConfig } from "@/lib/ldap";
 
 // Acepta email completo o usuario de red (ej: "jperez" o "DOMINIO\jperez")
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
 
         response.cookies.set("hd_token", token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
+          secure: isSessionCookieSecure(),
           sameSite: "lax",
           maxAge,
           path: "/",
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest) {
 
     response.cookies.set("hd_token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isSessionCookieSecure(),
       sameSite: "lax",
       maxAge,
       path: "/",

@@ -29,6 +29,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         status:     true,
         category:   true,
         comments: {
+          // Las notas internas nunca se envían al Usuario Final
+          ...(session.role === ROLES.USUARIO ? { where: { isInternal: false } } : {}),
           include: { user: { select: { id: true, name: true, lastname: true } } },
           orderBy: { createdAt: "asc" },
         },

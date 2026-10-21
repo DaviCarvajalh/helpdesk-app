@@ -14,7 +14,7 @@ docker compose build
 docker compose up -d
 ```
 
-Con esto la aplicación queda funcionando en `http://<APP_URL>` (o `http://172.20.2.133:3000` según `compose.yaml`).
+Con esto la aplicación queda funcionando en `http://<APP_URL>` (o `http://172.20.2.133:8070`; la IP y el puerto se cambian con `HOST_IP` y `PUERTO` en `.env`).
 **Las migraciones de Prisma se aplican automáticamente** mediante el servicio `migrate`
 (`compose.yaml`), que corre `prisma migrate deploy` usando el stage `builder` (instalación
 completa de Node, sin podar) y se ejecuta hasta completarse **antes** de que `app` arranque
@@ -57,7 +57,7 @@ docker compose exec db pg_dump -U helpdesk helpdesk > backup_$(date +%F).sql
 cat backup_YYYY-MM-DD.sql | docker compose exec -T db psql -U helpdesk -d helpdesk
 ```
 
-App accesible en `http://172.20.2.133:3000` (temporal, hasta configurar reverse proxy + DNS `helpdesk.ignisterra.cl`).
+App accesible en `http://172.20.2.133:8070` (temporal, hasta configurar reverse proxy + DNS `helpdesk.ignisterra.cl`).
 
 ## Getting Started
 

@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16-bookworm
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -16,12 +16,8 @@ services:
     networks:
       - internal
 
-  # Job de migración: aplica `prisma migrate deploy` usando el stage `builder`
-  # (npm ci completo, sin poda) para evitar depender de una copia manual del
-  # CLI de Prisma dentro de la imagen runtime minimizada. Se ejecuta una vez
-  # por cada `docker compose up`, antes de que arranque `app` (ver depends_on
-  # de `app` con condition: service_completed_successfully). Es idempotente.
   migrate:
+    image: helpdesk-migrate:${IMAGE_TAG:-latest}
     build:
       context: .
       target: builder
@@ -35,6 +31,7 @@ services:
     entrypoint: ["npx", "prisma", "migrate", "deploy"]
 
   app:
+    image: helpdesk-app:${IMAGE_TAG:-latest}
     build: .
     restart: unless-stopped
     depends_on:
@@ -48,6 +45,7 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       APP_URL: ${APP_URL}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       LDAP_ENABLED: ${LDAP_ENABLED:-false}
@@ -62,16 +60,16 @@ services:
       LDAP_GROUP_AUDITOR: ${LDAP_GROUP_AUDITOR:-}
       LDAP_ROLE_DEFAULT: ${LDAP_ROLE_DEFAULT:-Usuario Final}
     ports:
-      - "172.20.2.133:3000:3000"
+      # HOST_IP / PUERTO en .env; dentro del contenedor la app sigue en 3000
+      - "${HOST_IP:-172.20.2.133}:${PUERTO:-8070}:3000"
     volumes:
-      - uploads_data:/app/public/uploads
+      # Mismo volumen que antes; solo cambia el punto de montaje (fuera de /public)
+      - uploads_data:/app/uploads
     networks:
       - internal
 
-  # Servicio one-off para el seed inicial (roles, prioridades, estados, admin).
-  # No se inicia con `docker compose up`. Ejecutar manualmente una sola vez:
-  #   docker compose --profile tools run --rm seed
   seed:
+    image: helpdesk-seed:${IMAGE_TAG:-latest}
     build:
       context: .
       target: builder
