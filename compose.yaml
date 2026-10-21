@@ -63,7 +63,8 @@ services:
       LDAP_GROUP_AUDITOR: ${LDAP_GROUP_AUDITOR:-}
       LDAP_ROLE_DEFAULT: ${LDAP_ROLE_DEFAULT:-Usuario Final}
     ports:
-      - "172.20.2.133:3000:3000"
+      # HOST_IP / PUERTO en .env; dentro del contenedor la app sigue en 3000
+      - "${HOST_IP:-172.20.2.133}:${PUERTO:-8070}:3000"
     volumes:
       # Mismo volumen que antes; solo cambia el punto de montaje (fuera de /public)
       - uploads_data:/app/uploads
