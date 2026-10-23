@@ -10,6 +10,7 @@ const patchSchema = z.object({
   priorityId: z.string().optional(),
   title:       z.string().min(1).max(200).optional(),
   description: z.string().min(1).optional(),
+  resolution:  z.string().trim().max(5000).nullable().optional(),
 }).strict();
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -65,10 +66,28 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     });
     if (!ticket) return NextResponse.json({ message: "Ticket no encontrado" }, { status: 404 });
 
+    // Un ticket en estado de cierre siempre debe tener la solución aplicada
+    if (data.resolution !== undefined) data.resolution = data.resolution || null;
+    const targetStatus = data.statusId && data.statusId !== ticket.statusId
+      ? await prisma.cfgStatus.findUnique({ where: { id: data.statusId } })
+      : ticket.status;
+    if (!targetStatus) return NextResponse.json({ message: "Estado no válido" }, { status: 400 });
+
+    const resolution = data.resolution !== undefined ? data.resolution : ticket.resolution;
+    if (targetStatus.isClosed && !resolution) {
+      return NextResponse.json(
+        { message: "Debes registrar la solución aplicada para cerrar el ticket" },
+        { status: 400 }
+      );
+    }
+    const isClosing = targetStatus.isClosed && !ticket.status.isClosed;
+    const closedAt  = targetStatus.isClosed ? (isClosing ? new Date() : ticket.closedAt) : null;
+
     // Construir registros de historial para cada campo que cambia
     const LABEL: Record<string, string> = {
       statusId: "Estado", assigneeId: "Técnico asignado",
       priorityId: "Prioridad", title: "Título", description: "Descripción",
+      resolution: "Solución",
     };
     const historyRecords: { ticketId: string; field: string; oldValue: string | null; newValue: string | null; changedBy: string }[] = [];
 
@@ -90,7 +109,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const [updated] = await prisma.$transaction([
       prisma.hdTicket.update({
         where: { id: params.id },
-        data: { ...data, updatedBy: session.userId } as object,
+        data: { ...data, closedAt, updatedBy: session.userId } as object,
         include: {
           requester: { select: { id: true, name: true, lastname: true } },
           assignee:  { select: { id: true, name: true, lastname: true } },
@@ -105,8 +124,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     ]);
 
     // Emails fire-and-forget
-    const updatedTicket = updated as typeof updated & { status?: { isClosed?: boolean }; assignee?: { id?: string; name?: string; lastname?: string } | null };
-
     // Email al nuevo técnico si cambió assigneeId
     if (data.assigneeId && data.assigneeId !== ticket.assigneeId) {
       prisma.secUser.findUnique({ where: { id: data.assigneeId }, select: { email: true, name: true, lastname: true } })
@@ -120,14 +137,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         }).catch(() => {});
     }
 
-    // Email al solicitante si el nuevo estado es cerrado
-    if (data.statusId && updatedTicket.status?.isClosed) {
+    // Email al solicitante cuando el ticket pasa a un estado de cierre
+    if (isClosing) {
       prisma.secUser.findUnique({ where: { id: ticket.requesterId }, select: { email: true, name: true, lastname: true } })
         .then((u) => {
           if (u?.email) sendTicketClosed({
             to: u.email, name: `${u.name} ${u.lastname}`,
             ticketNumber: ticket.ticketNumber, ticketId: ticket.id,
-            title: ticket.title,
+            title: ticket.title, resolution: resolution ?? "",
           });
         }).catch(() => {});
     }

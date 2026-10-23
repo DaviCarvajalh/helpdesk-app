@@ -18,6 +18,13 @@ async function send(to: string, subject: string, html: string) {
   }
 }
 
+/** Escapa texto libre escrito por usuarios antes de insertarlo en el HTML del correo. */
+function esc(text: string) {
+  return text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 function wrap(title: string, body: string) {
   return `<!DOCTYPE html><html><body style="font-family:sans-serif;color:#374151;max-width:600px;margin:0 auto;padding:24px">
     <div style="background:#059669;padding:16px 24px;border-radius:8px 8px 0 0">
@@ -71,13 +78,15 @@ export async function sendTicketAssigned(opts: {
 /* ── Ticket cerrado → al solicitante ── */
 export async function sendTicketClosed(opts: {
   to: string; name: string;
-  ticketNumber: string; ticketId: string; title: string;
+  ticketNumber: string; ticketId: string; title: string; resolution: string;
 }) {
   const url  = `${BASE}/tickets/${opts.ticketId}`;
   const body = `
-    <p>Hola <strong>${opts.name}</strong>,</p>
+    <p>Hola <strong>${esc(opts.name)}</strong>,</p>
     <p>Tu ticket <strong>${opts.ticketNumber}</strong> ha sido <strong>cerrado</strong>.</p>
-    <p>${opts.title}</p>
+    <p>${esc(opts.title)}</p>
+    <p style="margin:16px 0 4px;color:#6b7280;font-size:13px">Solución aplicada</p>
+    <div style="background:#ecfdf5;border-left:3px solid #059669;padding:10px 14px;white-space:pre-wrap">${esc(opts.resolution)}</div>
     <a href="${url}" style="display:inline-block;margin-top:16px;background:#6b7280;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">Ver detalle</a>`;
   await send(opts.to, `[${opts.ticketNumber}] Ticket cerrado: ${opts.title}`, wrap("Ticket cerrado", body));
 }

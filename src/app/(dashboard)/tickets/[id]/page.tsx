@@ -7,7 +7,7 @@ import Header from "@/components/layout/Header";
 import Image from "next/image";
 import {
   ArrowLeft, AlertTriangle, FileText, User, Calendar,
-  Tag, Send, MessageSquare, Clock, CheckCircle2, ChevronDown, History, Paperclip,
+  Tag, Send, MessageSquare, Clock, CheckCircle2, ChevronDown, History, Paperclip, Wrench,
 } from "lucide-react";
 
 interface Comment {
@@ -23,6 +23,7 @@ interface TechOption      { id: string; name: string; lastname: string; }
 interface Ticket {
   id: string; ticketNumber: string; type: string; title: string;
   description: string; createdAt: string; updatedAt: string; slaDeadline?: string | null;
+  resolution?: string | null; closedAt?: string | null;
   requester:  { id: string; name: string; lastname: string; email: string } | null;
   assignee:   { id: string; name: string; lastname: string } | null;
   priority:   { id: string; name: string; color?: string | null } | null;
@@ -43,6 +44,8 @@ export default function TicketDetailPage() {
   const [technicians,   setTechnicians]   = useState<TechOption[]>([]);
   const [updating,      setUpdating]      = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [resolution,    setResolution]    = useState("");
+  const [actionError,   setActionError]   = useState("");
 
   const [attachments, setAttachments] = useState<string[]>([]);
 
@@ -78,20 +81,36 @@ export default function TicketDetailPage() {
     if (ticket?.status?.id) setSelectedStatus(ticket.status.id);
   }, [ticket?.status?.id]);
 
+  useEffect(() => {
+    setResolution(ticket?.resolution ?? "");
+  }, [ticket?.resolution]);
+
   async function patch(payload: Record<string, unknown>) {
     setUpdating(true);
+    setActionError("");
     const res = await fetch(`/api/tickets/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     if (res.ok) await loadTicket();
+    else setActionError((await res.json().catch(() => null))?.message ?? "No se pudo actualizar el ticket");
     setUpdating(false);
   }
 
+  // Al elegir un estado de cierre se pide la solución aplicada
+  const closingSelected   = statuses.find((s) => s.id === selectedStatus)?.isClosed ?? false;
+  const statusChanged     = !!selectedStatus && selectedStatus !== ticket?.status?.id;
+  const resolutionChanged = resolution.trim() !== (ticket?.resolution ?? "");
+  const canApply = (statusChanged || (closingSelected && resolutionChanged))
+    && (!closingSelected || !!resolution.trim());
+
   async function applyStatus() {
-    if (!selectedStatus || selectedStatus === ticket?.status?.id) return;
-    await patch({ statusId: selectedStatus });
+    if (!canApply) return;
+    await patch({
+      ...(statusChanged ? { statusId: selectedStatus } : {}),
+      ...(closingSelected ? { resolution: resolution.trim() } : {}),
+    });
   }
 
   async function sendComment(e: React.FormEvent) {
@@ -182,6 +201,22 @@ export default function TicketDetailPage() {
                 <h2 className="text-sm font-semibold text-gray-700 mb-3">Descripción</h2>
                 <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">{ticket.description}</p>
               </div>
+
+              {/* Solución aplicada */}
+              {ticket.resolution && (
+                <div className="bg-emerald-50 rounded-xl border border-emerald-100 shadow-sm p-5">
+                  <h2 className="text-sm font-semibold text-emerald-800 mb-3 flex items-center gap-2">
+                    <Wrench size={14} className="text-emerald-600" />
+                    Solución aplicada
+                    {ticket.closedAt && (
+                      <span className="ml-auto text-xs font-normal text-emerald-600">
+                        {new Date(ticket.closedAt).toLocaleString("es-CL")}
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{ticket.resolution}</p>
+                </div>
+              )}
 
               {/* Comments */}
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -324,13 +359,33 @@ export default function TicketDetailPage() {
                   </div>
                 </div>
 
+                {/* Solución (obligatoria para estados de cierre) */}
+                {closingSelected && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1.5">
+                      Solución aplicada <span className="text-red-500">*</span>
+                    </p>
+                    <textarea
+                      value={resolution}
+                      onChange={(e) => setResolution(e.target.value)}
+                      disabled={updating}
+                      rows={4}
+                      maxLength={5000}
+                      placeholder="Describe qué se hizo para resolver el ticket..."
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-y disabled:opacity-60" />
+                    <p className="text-xs text-gray-400 mt-1">Visible para el solicitante.</p>
+                  </div>
+                )}
+
+                {actionError && <p className="text-xs text-red-600">{actionError}</p>}
+
                 {/* Botón aplicar estado */}
                 <button
                   onClick={applyStatus}
-                  disabled={updating || !selectedStatus || selectedStatus === ticket.status?.id}
+                  disabled={updating || !canApply}
                   className="w-full flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-200 disabled:text-gray-400 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
                   <CheckCircle2 size={14} />
-                  {updating ? "Aplicando..." : "Aplicar Estado"}
+                  {updating ? "Aplicando..." : statusChanged ? "Aplicar Estado" : "Guardar solución"}
                 </button>
               </div>
 

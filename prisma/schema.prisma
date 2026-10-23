@@ -215,6 +215,7 @@ model HdTicket {
   statusId     String    @map("status_id")
   slaDeadline  DateTime? @map("sla_deadline")
   closedAt     DateTime? @map("closed_at")
+  resolution   String?   // Solución aplicada; obligatoria al pasar a un estado de cierre
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
